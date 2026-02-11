@@ -1,0 +1,27 @@
+{
+  "common": {
+    "back": "Volver",
+    "save": "Guardar",
+    "next": "Siguiente",
+    "cancel": "Cancelar",
+    "loading": "Cargando..."
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "signUp": "Registrarse",
+    "email": "Correo electrónico",
+    "password": "Contraseña"
+  },
+  "menu": {
+    "title": "Platos del día",
+    "seeAll": "Ver todo",
+    "add": "Agregar",
+    "searchPlaceholder": "¿Qué busca tu bebé hoy?"
+  },
+  "cart": {
+    "title": "Tu Carrito",
+    "checkout": "Finalizar Compra",
+    "empty": "Tu carrito está vacío",
+    "subscribeSave": "Suscríbete y ahorra 15%"
+  }
+}
