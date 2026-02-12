@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 
 type School = { id: string; name: string; address: string };
 
+export const dynamic = "force-dynamic";
+
 const STEPS = [
   { id: 1, label: "Dirección", key: "address" },
   { id: 2, label: "Fecha y Hora", key: "datetime" },
