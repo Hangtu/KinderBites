@@ -136,7 +136,7 @@ function OnboardingChildPageInner() {
     // Modo invitado: solo guardamos en el store y seguimos el onboarding
     setChild({
       name: data.name,
-      birthDate: data.birthDate,
+      birthDate: data.birthDate ?? "",
       schoolName: data.schoolName ?? "",
       grade: data.grade ?? "",
       allergyIds: selectedAllergies,

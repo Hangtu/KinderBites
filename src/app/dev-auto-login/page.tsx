@@ -6,9 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 
 const isLocalEnv = process.env.NEXT_PUBLIC_ENV === "local";
 const devEmail = process.env.NEXT_PUBLIC_DEV_EMAIL;
+
 const devPassword = process.env.NEXT_PUBLIC_DEV_PASSWORD;
 
-export default function DevAutoLoginPage() {
+export const dynamic = "force-dynamic";
+
+
+function DevAutoLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect") ?? "/";
@@ -54,5 +58,15 @@ export default function DevAutoLoginPage() {
       <p className="text-muted-foreground">Iniciando sesión automática...</p>
       <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
     </div>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function DevAutoLoginPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <DevAutoLoginPageContent />
+    </Suspense>
   );
 }
