@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/api"];
+const PUBLIC_PATHS = ["/", "/login", "/dev-auto-login", "/auth", "/api"];
 const ONBOARDING_PREFIX = "/onboarding";
 
 function isProtectedPath(path: string) {
@@ -24,7 +24,9 @@ export function AuthSessionHandler() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" && !session && isProtectedPath(pathname)) {
-        router.push(`/login?redirect=${encodeURIComponent(pathname)}`);
+        const loginPath =
+          process.env.NEXT_PUBLIC_ENV === "local" ? "/dev-auto-login" : "/login";
+        router.push(`${loginPath}?redirect=${encodeURIComponent(pathname)}`);
         router.refresh();
       }
     });

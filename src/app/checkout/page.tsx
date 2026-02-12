@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCartStore } from "@/store/cart-store";
 import { useDeliveryAddresses } from "@/hooks/use-delivery-addresses";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+
+type School = { id: string; name: string; address: string };
 
 const STEPS = [
   { id: 1, label: "Dirección", key: "address" },
@@ -28,73 +29,51 @@ const LABEL_MAP: Record<string, string> = {
   office: "Oficina",
 };
 
-const ADDRESS_LABELS = [
-  { id: "school" as const, name: "Escuela", icon: "school" },
-  { id: "home" as const, name: "Casa", icon: "home" },
-  { id: "office" as const, name: "Oficina", icon: "work" },
-];
-
 function AddAddressForm({
-  label,
-  setLabel,
-  school,
-  setSchool,
+  schools,
+  selectedSchoolId,
+  setSelectedSchoolId,
+  schoolName,
   address,
-  setAddress,
   timeSlot,
   setTimeSlot,
   onSubmit,
   loading,
   error,
   onCancel,
-  LABEL_MAP: lm,
 }: {
-  label: "school" | "home" | "office";
-  setLabel: (l: "school" | "home" | "office") => void;
-  school: string;
-  setSchool: (s: string) => void;
+  schools: School[];
+  selectedSchoolId: string;
+  setSelectedSchoolId: (id: string) => void;
+  schoolName: string;
   address: string;
-  setAddress: (s: string) => void;
   timeSlot: "morning" | "evening";
   setTimeSlot: (s: "morning" | "evening") => void;
   onSubmit: () => void;
   loading: boolean;
   error: string | null;
   onCancel: () => void;
-  LABEL_MAP: Record<string, string>;
 }) {
   return (
     <div className="p-4 rounded-xl border-2 border-primary/30 bg-white dark:bg-surface-dark space-y-4">
       <h4 className="font-bold text-sm">Nueva dirección</h4>
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {ADDRESS_LABELS.map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            onClick={() => setLabel(l.id)}
-            className={`px-4 py-2 rounded-full text-sm font-medium shrink-0 ${
-              label === l.id ? "bg-primary text-black" : "bg-gray-100 dark:bg-gray-800"
-            }`}
-          >
-            {lm[l.id]}
-          </button>
-        ))}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-slate-500">Escuela</label>
+        <select
+          value={selectedSchoolId}
+          onChange={(e) => setSelectedSchoolId(e.target.value)}
+          required
+          className="flex h-11 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm"
+        >
+          <option value="">Selecciona una escuela</option>
+          {schools.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        {selectedSchoolId && (
+          <p className="text-xs text-slate-500">{address}</p>
+        )}
       </div>
-      {label === "school" && (
-        <Input
-          placeholder="Nombre de escuela/guardería"
-          value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          className="h-11"
-        />
-      )}
-      <Input
-        placeholder="Dirección de envío"
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
-        required
-        className="h-11"
-      />
       <div className="flex gap-2">
         <button
           type="button"
@@ -136,27 +115,36 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [addAddrLabel, setAddAddrLabel] = useState<"school" | "home" | "office">("school");
-  const [addAddrSchool, setAddAddrSchool] = useState("");
+  const [addAddrSelectedSchoolId, setAddAddrSelectedSchoolId] = useState("");
+  const [addAddrSchoolName, setAddAddrSchoolName] = useState("");
   const [addAddrAddress, setAddAddrAddress] = useState("");
   const [addAddrTimeSlot, setAddAddrTimeSlot] = useState<"morning" | "evening">("morning");
   const [addAddrLoading, setAddAddrLoading] = useState(false);
   const [addAddrError, setAddAddrError] = useState<string | null>(null);
+  const [schools, setSchools] = useState<School[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    createClient()
+      .from("schools")
+      .select("id, name, address")
+      .eq("is_available", true)
+      .order("name")
+      .then(({ data }) => setSchools(data ?? []));
+  }, []);
   const { items, getSubtotal, getTotal, isSubscription, clearCart } = useCartStore();
   const { addresses, isLoading: addressesLoading, refetch: refetchAddresses } = useDeliveryAddresses();
   const supabase = createClient();
 
   const handleAddAddress = async () => {
-    if (!addAddrAddress.trim()) {
-      setAddAddrError("Ingresa la dirección");
+    const addr = addAddrSelectedSchoolId && addAddrAddress.trim() ? addAddrAddress.trim() : "";
+    if (!addr) {
+      setAddAddrError("Selecciona una escuela");
       return;
     }
     setAddAddrLoading(true);
     setAddAddrError(null);
     const preferredSlot = addAddrTimeSlot === "morning" ? "11:30" : "17:30";
-    // Nota: aquí podríamos soportar direcciones solo en memoria,
-    // pero por ahora mantener la creación de direcciones solo para usuarios logueados.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -170,9 +158,10 @@ export default function CheckoutPage() {
       .from("delivery_addresses")
       .insert({
         profile_id: user.id,
-        label: addAddrLabel,
-        address: addAddrAddress.trim(),
-        school_name: addAddrLabel === "school" ? addAddrSchool || null : null,
+        label: "school",
+        address: addr,
+        school_id: addAddrSelectedSchoolId || null,
+        school_name: addAddrSchoolName || null,
         preferred_time_slot: preferredSlot,
         is_default: false,
       })
@@ -187,7 +176,8 @@ export default function CheckoutPage() {
     setSelectedAddressId(newAddr.id);
     setShowAddAddress(false);
     setAddAddrAddress("");
-    setAddAddrSchool("");
+    setAddAddrSelectedSchoolId("");
+    setAddAddrSchoolName("");
   };
 
   const subtotal = getSubtotal();
@@ -315,19 +305,29 @@ export default function CheckoutPage() {
                 </div>
                 {showAddAddress && (
                   <AddAddressForm
-                    label={addAddrLabel}
-                    setLabel={setAddAddrLabel}
-                    school={addAddrSchool}
-                    setSchool={setAddAddrSchool}
+                    schools={schools}
+                    selectedSchoolId={addAddrSelectedSchoolId}
+                    setSelectedSchoolId={(id) => {
+                      setAddAddrSelectedSchoolId(id);
+                      const s = schools.find((x) => x.id === id);
+                      if (s) {
+                        setAddAddrSchoolName(s.name);
+                        setAddAddrAddress(s.address);
+                      }
+                    }}
+                    schoolName={addAddrSchoolName}
                     address={addAddrAddress}
-                    setAddress={setAddAddrAddress}
                     timeSlot={addAddrTimeSlot}
                     setTimeSlot={setAddAddrTimeSlot}
                     onSubmit={handleAddAddress}
                     loading={addAddrLoading}
                     error={addAddrError}
-                    onCancel={() => setShowAddAddress(false)}
-                    LABEL_MAP={LABEL_MAP}
+                    onCancel={() => {
+                      setShowAddAddress(false);
+                      setAddAddrSelectedSchoolId("");
+                      setAddAddrSchoolName("");
+                      setAddAddrAddress("");
+                    }}
                   />
                 )}
               </div>
@@ -369,19 +369,29 @@ export default function CheckoutPage() {
                 ))}
                 {showAddAddress ? (
                   <AddAddressForm
-                    label={addAddrLabel}
-                    setLabel={setAddAddrLabel}
-                    school={addAddrSchool}
-                    setSchool={setAddAddrSchool}
+                    schools={schools}
+                    selectedSchoolId={addAddrSelectedSchoolId}
+                    setSelectedSchoolId={(id) => {
+                      setAddAddrSelectedSchoolId(id);
+                      const s = schools.find((x) => x.id === id);
+                      if (s) {
+                        setAddAddrSchoolName(s.name);
+                        setAddAddrAddress(s.address);
+                      }
+                    }}
+                    schoolName={addAddrSchoolName}
                     address={addAddrAddress}
-                    setAddress={setAddAddrAddress}
                     timeSlot={addAddrTimeSlot}
                     setTimeSlot={setAddAddrTimeSlot}
                     onSubmit={handleAddAddress}
                     loading={addAddrLoading}
                     error={addAddrError}
-                    onCancel={() => setShowAddAddress(false)}
-                    LABEL_MAP={LABEL_MAP}
+                    onCancel={() => {
+                      setShowAddAddress(false);
+                      setAddAddrSelectedSchoolId("");
+                      setAddAddrSchoolName("");
+                      setAddAddrAddress("");
+                    }}
                   />
                 ) : (
                   <Button variant="outline" onClick={() => setShowAddAddress(true)} className="w-full">

@@ -72,6 +72,19 @@ export const children = pgTable("children", {
     .notNull(),
 });
 
+export const schools = pgTable("schools", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  isAvailable: boolean("is_available").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const deliveryAddresses = pgTable("delivery_addresses", {
   id: uuid("id").primaryKey().defaultRandom(),
   profileId: uuid("profile_id")
@@ -79,6 +92,7 @@ export const deliveryAddresses = pgTable("delivery_addresses", {
     .references(() => profiles.id, { onDelete: "cascade" }),
   label: addressLabelEnum("label").notNull().default("school"),
   address: text("address").notNull(),
+  schoolId: uuid("school_id").references(() => schools.id, { onDelete: "set null" }),
   schoolName: text("school_name"),
   preferredTimeSlot: text("preferred_time_slot"),
   lat: decimal("lat", { precision: 10, scale: 8 }),

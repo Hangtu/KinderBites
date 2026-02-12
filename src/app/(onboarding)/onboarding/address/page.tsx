@@ -5,26 +5,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useOnboardingStore } from "@/store/onboarding-store";
-
-const ADDRESS_LABELS = [
-  { id: "school", name: "Escuela", icon: "school" },
-  { id: "home", name: "Casa", icon: "home" },
-  { id: "office", name: "Oficina", icon: "work" },
-] as const;
 
 const DELIVERY_SLOTS = [
   { id: "morning", label: "Antes del almuerzo", sublabel: "Recomendado: 11:30 AM", icon: "wb_sunny" },
   { id: "evening", label: "Para la cena", sublabel: "Recomendado: 5:30 PM", icon: "bedtime" },
 ];
 
+type School = { id: string; name: string; address: string };
+
 function OnboardingAddressPageInner() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const isEdit = !!editId;
 
-  const [label, setLabel] = useState<"school" | "home" | "office">("school");
+  const [schools, setSchools] = useState<School[]>([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
   const [schoolName, setSchoolName] = useState("");
   const [address, setAddress] = useState("");
   const [timeSlot, setTimeSlot] = useState("morning");
@@ -32,7 +28,25 @@ function OnboardingAddressPageInner() {
   const [loadingAddr, setLoadingAddr] = useState(!!editId);
   const router = useRouter();
   const supabase = createClient();
-  const { address: storedAddress, setAddress: setStoredAddress } = useOnboardingStore();
+  const { child: storedChild, address: storedAddress, setAddress: setStoredAddress } = useOnboardingStore();
+
+  useEffect(() => {
+    supabase
+      .from("schools")
+      .select("id, name, address")
+      .eq("is_available", true)
+      .order("name")
+      .then(({ data }) => setSchools(data ?? []));
+  }, [supabase]);
+
+  useEffect(() => {
+    if (schools.length > 0 && storedAddress?.schoolName && !selectedSchoolId) {
+      const match = schools.find(
+        (s) => s.name === storedAddress.schoolName || s.address === storedAddress.address
+      );
+      if (match) setSelectedSchoolId(match.id);
+    }
+  }, [schools, storedAddress, selectedSchoolId]);
 
   useEffect(() => {
     if (editId) {
@@ -44,15 +58,13 @@ function OnboardingAddressPageInner() {
           .single();
         setLoadingAddr(false);
         if (error || !data) return;
-        setLabel(data.label as "school" | "home" | "office");
         setSchoolName(data.school_name ?? "");
         setAddress(data.address ?? "");
+        if (data.school_id) setSelectedSchoolId(data.school_id);
         const slot = data.preferred_time_slot === "17:30" ? "evening" : "morning";
         setTimeSlot(slot);
       })();
     } else if (storedAddress) {
-      // Prefill desde el store en modo invitado
-      setLabel(storedAddress.label);
       setSchoolName(storedAddress.schoolName);
       setAddress(storedAddress.address);
       setTimeSlot(storedAddress.timeSlot);
@@ -81,9 +93,10 @@ function OnboardingAddressPageInner() {
       const { error } = await supabase
         .from("delivery_addresses")
         .update({
-          label,
+          label: "school",
           address,
-          school_name: label === "school" ? schoolName : null,
+          school_id: selectedSchoolId || null,
+          school_name: schoolName || null,
           preferred_time_slot: preferredSlot,
         })
         .eq("id", editId);
@@ -98,14 +111,59 @@ function OnboardingAddressPageInner() {
       return;
     }
 
-    // Modo invitado: guardar solo en el store y seguir flujo
-    setAddress(address);
-    setLabel(label);
-    setSchoolName(schoolName);
-    setTimeSlot(timeSlot as "morning" | "evening");
+    // Guardar en el store
+    const addressData = {
+      label: "school" as const,
+      schoolName,
+      address,
+      timeSlot: timeSlot as "morning" | "evening",
+    };
+    setStoredAddress(addressData);
+
+    // Si el usuario está logueado, persistir niño + dirección en DB antes de ir al menú
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user && storedChild) {
+      const { error: childError } = await supabase
+        .from("children")
+        .insert({
+          parent_id: user.id,
+          name: storedChild.name,
+          birth_date: storedChild.birthDate || null,
+          school_name: storedChild.schoolName ?? "",
+          grade: storedChild.grade ?? "",
+          allergy_ids: storedChild.allergyIds ?? [],
+          avoided_foods: storedChild.avoidedFoods ?? [],
+          special_notes: storedChild.specialNotes ?? null,
+        });
+
+      if (childError) {
+        console.error("Error al crear niño:", childError);
+        setLoading(false);
+        return;
+      }
+
+      const { error: addrError } = await supabase.from("delivery_addresses").insert({
+        profile_id: user.id,
+        label: "school",
+        address,
+        school_id: selectedSchoolId || null,
+        school_name: schoolName || null,
+        preferred_time_slot: preferredSlot,
+        is_default: true,
+      });
+
+      if (addrError) {
+        console.error("Error al crear dirección:", addrError);
+        setLoading(false);
+        return;
+      }
+    }
 
     setLoading(false);
     router.push("/menu");
+    router.refresh();
   };
 
   return (
@@ -122,70 +180,49 @@ function OnboardingAddressPageInner() {
       </header>
 
       <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }} className="flex-grow p-6 space-y-8">
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-primary/80">
-            Etiquetar como
-          </h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-            {ADDRESS_LABELS.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => setLabel(l.id)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold shrink-0 transition-all ${
-                  label === l.id
-                    ? "bg-primary text-white shadow-md"
-                    : "bg-primary/10 text-primary border border-primary/20"
-                }`}
-              >
-                <span className="material-symbols-outlined text-lg">{l.icon}</span>
-                <span className="text-sm">{l.name}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
         <section className="space-y-6">
-          {label === "school" && (
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-500 dark:text-slate-400 ml-1">
-                Nombre de la Escuela/Guardería
-              </label>
-              <div className="relative">
-                <Input
-                  placeholder="Ej: Guardería Mis Primeros Pasos"
-                  value={schoolName}
-                  onChange={(e) => setSchoolName(e.target.value)}
-                  className="h-14 pl-4 pr-12 bg-slate-50 dark:bg-slate-900"
-                />
-                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-primary/60">
-                  business
-                </span>
-              </div>
-            </div>
-          )}
-
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-500 dark:text-slate-400 ml-1">
-              Dirección de envío
+              Escuela (donde tenemos disponibilidad)
             </label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">
-                location_on
-              </span>
-              <Input
-                placeholder="Buscar dirección..."
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                required
-                className="h-14 pl-12 pr-4 bg-slate-50 dark:bg-slate-900"
-              />
-            </div>
-            <div className="mt-3 h-32 w-full rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-              <span className="material-symbols-outlined text-4xl text-slate-400">
-                map
-              </span>
-            </div>
+              <div className="relative">
+                <select
+                  value={selectedSchoolId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedSchoolId(id);
+                    const school = schools.find((s) => s.id === id);
+                    if (school) {
+                      setSchoolName(school.name);
+                      setAddress(school.address);
+                    }
+                  }}
+                  required
+                  className="flex h-14 w-full rounded-2xl border border-gray-100 dark:border-gray-800 bg-slate-50 dark:bg-slate-900 px-4 pr-12 text-sm font-medium text-slate-800 dark:text-white focus:border-primary focus:outline-none focus:ring-0"
+                >
+                  <option value="">Selecciona una escuela</option>
+                  {schools.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary/60">
+                  school
+                </span>
+              </div>
+            {selectedSchoolId && (
+              <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">location_on</span>
+                {address}
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 h-32 w-full rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+            <span className="material-symbols-outlined text-4xl text-slate-400">
+              map
+            </span>
           </div>
 
           <div className="space-y-4">
@@ -241,7 +278,7 @@ function OnboardingAddressPageInner() {
         <footer className="p-6 bg-white dark:bg-background-dark border-t border-slate-100 dark:border-slate-900">
           <Button
             type="submit"
-            disabled={loading || loadingAddr || !address}
+            disabled={loading || loadingAddr || !selectedSchoolId}
             className="w-full h-16 text-lg"
           >
           <span>{loading ? "Guardando..." : isEdit ? "Guardar cambios" : "Guardar preferencias"}</span>

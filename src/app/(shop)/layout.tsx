@@ -13,7 +13,9 @@ export default async function ShopLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/menu");
+    const loginPath =
+      process.env.NEXT_PUBLIC_ENV === "local" ? "/dev-auto-login" : "/login";
+    redirect(`${loginPath}?redirect=/menu`);
   }
 
   const [{ count: childrenCount }, { count: addressesCount }] = await Promise.all([

@@ -33,11 +33,19 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isProtected = protectedPaths.some((p) => path.startsWith(p));
   const isAuthPage = authPaths.some((p) => path.startsWith(p));
+  const isLocalEnv = process.env.NEXT_PUBLIC_ENV === "local";
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = isLocalEnv ? "/dev-auto-login" : "/login";
     url.searchParams.set("redirect", path);
+    return NextResponse.redirect(url);
+  }
+
+  if (isAuthPage && !user && isLocalEnv) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dev-auto-login";
+    url.searchParams.set("redirect", "/menu");
     return NextResponse.redirect(url);
   }
 

@@ -12,7 +12,9 @@ export default async function AdminLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirect=/admin/products");
+    const loginPath =
+      process.env.NEXT_PUBLIC_ENV === "local" ? "/dev-auto-login" : "/login";
+    redirect(`${loginPath}?redirect=/admin/products`);
   }
 
   return <>{children}</>;
