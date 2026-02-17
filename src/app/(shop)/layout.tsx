@@ -1,9 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Footer } from "@/components/footer";
-import { db } from "@/lib/db";
-import { children as childrenTable, deliveryAddresses } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { getProfileCounts } from "@/actions/profile";
 
 export default async function ShopLayout({
   children,
@@ -16,19 +14,8 @@ export default async function ShopLayout({
     redirect("/login?redirect=/menu");
   }
 
-  const [childrenCountResult, addressesCountResult] = await Promise.all([
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(childrenTable)
-      .where(eq(childrenTable.parentId, userId)),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(deliveryAddresses)
-      .where(eq(deliveryAddresses.profileId, userId)),
-  ]);
+  const { childrenCount, addressesCount } = await getProfileCounts();
 
-  const childrenCount = Number(childrenCountResult[0]?.count ?? 0);
-  const addressesCount = Number(addressesCountResult[0]?.count ?? 0);
 
   if (childrenCount === 0) {
     redirect("/onboarding/child");

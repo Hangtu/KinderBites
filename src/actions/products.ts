@@ -2,7 +2,10 @@
 
 import { db } from "@/lib/db";
 import { products } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
+
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;
 
 export async function getProducts(category?: string) {
     let query = db
@@ -38,12 +41,12 @@ export async function getAdminProducts() {
     return data;
 }
 
-export async function createProduct(data: typeof products.$inferInsert) {
+export async function createProduct(data: NewProduct) {
     const [newProduct] = await db.insert(products).values(data).returning();
     return newProduct;
 }
 
-export async function updateProduct(id: string, data: Partial<typeof products.$inferInsert>) {
+export async function updateProduct(id: string, data: Partial<NewProduct>) {
     const [updatedProduct] = await db
         .update(products)
         .set({ ...data, updatedAt: new Date() })

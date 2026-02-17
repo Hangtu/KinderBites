@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/db";
-import { orders } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { getOrder } from "@/actions/orders";
 
 const LABEL_MAP: Record<string, string> = {
   school: "Escuela",
@@ -18,9 +16,9 @@ export default async function CheckoutSuccessPage({
   const params = await searchParams;
   const orderId = params.orderId;
 
-  let order: Awaited<ReturnType<typeof fetchOrder>> = undefined;
+  let order;
   if (orderId) {
-    order = await fetchOrder(orderId);
+    order = await getOrder(orderId);
   }
 
   return (
@@ -85,18 +83,3 @@ export default async function CheckoutSuccessPage({
   );
 }
 
-async function fetchOrder(orderId: string) {
-  const data = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-    with: {
-      orderItems: {
-        with: {
-          product: true,
-          child: true,
-        },
-      },
-      deliveryAddress: true,
-    },
-  });
-  return data;
-}

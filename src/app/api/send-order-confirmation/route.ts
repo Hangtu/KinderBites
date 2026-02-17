@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { businessInfo } from "@/lib/business-info";
-import { db } from "@/lib/db";
+import { getOrder } from "@/actions/orders";
 import { currentUser } from "@clerk/nextjs/server";
-import { orders } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -34,18 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const order = await db.query.orders.findFirst({
-    where: eq(orders.id, orderId),
-    with: {
-      orderItems: {
-        with: {
-          product: true,
-          child: true,
-        },
-      },
-      deliveryAddress: true,
-    },
-  });
+  const order = await getOrder(orderId);
 
   if (!order) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });

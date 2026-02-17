@@ -1,8 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { children, deliveryAddresses } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { createChild, getChildren } from "@/actions/children";
+import { createAddress, getAddresses } from "@/actions/addresses";
 
 /**
  * POST /api/seed-demo
@@ -16,14 +15,11 @@ export async function POST() {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const existingChildren = await db.query.children.findMany({
-    where: eq(children.parentId, userId),
-  });
+  const existingChildren = await getChildren();
 
   if (existingChildren.length === 0) {
     try {
-      await db.insert(children).values({
-        parentId: userId,
+      await createChild({
         name: "Mateo (demo)",
         schoolName: "Guardería Mis Primeros Pasos",
         grade: "Kinder",
@@ -38,14 +34,11 @@ export async function POST() {
     }
   }
 
-  const existingAddresses = await db.query.deliveryAddresses.findMany({
-    where: eq(deliveryAddresses.profileId, userId),
-  });
+  const existingAddresses = await getAddresses();
 
   if (existingAddresses.length === 0) {
     try {
-      await db.insert(deliveryAddresses).values({
-        profileId: userId,
+      await createAddress({
         label: "school",
         address: "Av. Principal 123, Col. Centro",
         schoolName: "Guardería Mis Primeros Pasos",

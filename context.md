@@ -113,6 +113,7 @@ _Use only the tools listed below. Do not introduce new libraries without permiss
 2. **File Structure:** Use `kebab-case` for file names.
 3. **Component Strategy:** Use functional components. Prefer server components by default.
 4. **Error Handling:** All server actions must return standardized error objects.
+5. **Database Abstraction (DAL):** Isolate all database queries (Drizzle/SQL) into dedicated Server Actions or Data Access Layer functions (e.g., `src/actions/` or `src/services/`). Never import DB clients directly in UI components. This ensures generic facades if the underlying DB changes.
 
 ---
 
@@ -201,21 +202,22 @@ _Update this section at the start of every coding session._
 
 **Scope:**
 
-- [x] **Login Screen:** Email/Pass + Registro.
-- [x] **Middleware:** Protege `/checkout`, `/orders`, `/profile`, `/admin`.
+- [x] **Login Screen:** Email/Pass + Registro (Clerk).
+- [x] **Middleware:** Protege `/checkout`, `/orders`, `/profile`, `/admin` (Clerk Middleware).
 - [x] **Layout Shop:** Exige niño + dirección en DB para menú, carrito, pedidos.
-- [ ] **Auth Migration (Supabase → Clerk):**
-  - [ ] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase`).
-  - [ ] Instalar `@clerk/nextjs` e integrar `<ClerkProvider>` en `layout.tsx`.
-  - [ ] Configurar Middleware con `clerkMiddleware()` para proteger rutas (`/menu`, `/checkout`, `/admin`).
-  - [ ] Habilitar Google One Tap en Clerk Dashboard + Componente.
-- [ ] **DB Migration (Supabase → Neon):**
-  - [ ] Actualizar `DATABASE_URL` en `.env` con connection string de Neon.
-  - [ ] Verificar compatibilidad de Drizzle con `postgres.js` o `neondatabase/serverless` (según necesidad de edge).
+- [x] **Auth Migration (Supabase → Clerk):**
+  - [x] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase` — *En proceso: eliminado de vistas principales*).
+  - [x] Instalar `@clerk/nextjs` e integrar `<ClerkProvider>` en `layout.tsx`.
+  - [x] Configurar Middleware con `clerkMiddleware()` para proteger rutas (`/menu`, `/checkout`, `/admin`).
+  - [ ] Habilitar Google One Tap en Clerk Dashboard + Componente (Pendiente).
+- [x] **DB Migration (Supabase → Neon):**
+  - [x] Actualizar `DATABASE_URL` en `.env` con connection string de Neon.
+  - [x] Verificar compatibilidad de Drizzle con `postgres.js` o `neondatabase/serverless` (Usando `postgres.js`).
+  -
 - [ ] **Storage Migration (Supabase → R2):**
-  - [ ] Instalar `@aws-sdk/client-s3`.
-  - [ ] Crear cliente S3 compatible con R2 en `src/lib/r2.ts`.
-  - [ ] Actualizar `next.config.ts` para permitir dominios de imágenes de R2.
+  - [x] Instalar `@aws-sdk/client-s3`.
+  - [ ] Crear cliente S3 compatible con R2 en `src/lib/r2.ts` (Pendiente integración final).
+  - [ ] Actualizar `next.config.ts` para permitir dominios de imágenes de R2 (Pendiente).
 
 ### 🟢 Phase 2: Core Feature — Tienda (implementado)
 
