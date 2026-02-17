@@ -20,6 +20,7 @@ const notoSans = Noto_Sans({
 export const metadata: Metadata = {
   title: "Lonchi - Lonches saludables para tu pequeño",
   description: "Comidas saludables listas en minutos para niños de kinder y primaria",
+  authors: [{ name: "Hang Tu Wong Ley Franco" }],
 };
 
 export const viewport = {

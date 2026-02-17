@@ -72,6 +72,15 @@ export default function ProfilePage() {
         <Button variant="outline" onClick={handleSignOut} className="w-full">
           Cerrar sesión
         </Button>
+
+        <div className="pt-8 text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-600">
+            KinderBites v1.0 — MVP
+          </p>
+          <p className="text-xs text-slate-400 dark:text-slate-600 mt-1">
+            Desarrollado por <span className="font-medium">Hang Tu Wong Ley Franco</span>
+          </p>
+        </div>
       </div>
     </div>
   );
