@@ -67,12 +67,12 @@ export default function CartPage() {
               <div
                 className="size-20 rounded-xl bg-gray-100 dark:bg-gray-800 shrink-0 bg-cover bg-center"
                 style={
-                  item.product.image_url
-                    ? { backgroundImage: `url(${item.product.image_url})` }
+                  item.product.imageUrl
+                    ? { backgroundImage: `url(${item.product.imageUrl})` }
                     : {}
                 }
               >
-                {!item.product.image_url && (
+                {!item.product.imageUrl && (
                   <div className="w-full h-full flex items-center justify-center text-3xl">
                     🍽️
                   </div>
@@ -85,10 +85,10 @@ export default function CartPage() {
                       {item.product.name}
                     </h3>
                     <p className="text-text-sec-light dark:text-text-sec-dark text-xs font-medium mt-1">
-                      {item.product.net_weight_g
-                        ? `${item.product.net_weight_g}g`
+                      {item.product.netWeightG
+                        ? `${item.product.netWeightG}g`
                         : ""}{" "}
-                      {item.product.is_organic && "• Orgánico"}
+                      {item.product.isOrganic && "• Orgánico"}
                     </p>
                   </div>
                   <button

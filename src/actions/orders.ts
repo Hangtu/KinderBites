@@ -60,6 +60,7 @@ export async function createOrder(data: CreateOrderData) {
         );
     }
 
+    return newOrder;
 }
 
 export async function getOrders() {
@@ -118,4 +119,32 @@ export async function cancelOrder(id: string) {
     return true;
 }
 
+export async function getAdminOrders(status?: string) {
+    const data = await db.query.orders.findMany({
+        orderBy: desc(orders.createdAt),
+        with: {
+            orderItems: {
+                with: {
+                    product: true,
+                    child: true,
+                }
+            },
+            deliveryAddress: true,
+        }
+    });
 
+    if (status) {
+        return data.filter((o) => o.status === status);
+    }
+
+    return data;
+}
+
+export async function updateOrderStatus(id: string, status: string) {
+    const [updatedOrder] = await db
+        .update(orders)
+        .set({ status: status as any, updatedAt: new Date() })
+        .where(eq(orders.id, id))
+        .returning();
+    return updatedOrder;
+}

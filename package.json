@@ -9,12 +9,7 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "supabase:start": "supabase start",
-    "supabase:stop": "supabase stop",
-    "supabase:status": "supabase status",
-    "supabase:reset": "supabase db reset",
-    "supabase:migrate": "supabase migration up"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.991.0",
@@ -35,6 +30,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.38.0",
     "drizzle-zod": "^0.5.0",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.460.0",
     "next": "^15.1.0",
     "next-intl": "^3.25.0",
@@ -58,7 +54,6 @@
     "drizzle-kit": "^0.30.0",
     "eslint": "^9",
     "eslint-config-next": "^15.1.0",
-    "supabase": "^2.76.8",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

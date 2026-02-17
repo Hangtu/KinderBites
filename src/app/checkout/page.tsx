@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useCartStore } from "@/store/cart-store";
 import { useDeliveryAddresses } from "@/hooks/use-delivery-addresses";
 import { Button } from "@/components/ui/button";
 import { getSchools } from "@/actions/schools";
 import { createAddress } from "@/actions/addresses";
 import { createOrder } from "@/actions/orders";
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 type School = { id: string; name: string; address: string };
 
@@ -20,11 +24,11 @@ const STEPS = [
   { id: 3, label: "Pago", key: "payment" },
 ];
 
+const CUTOFF_HOUR = 8; // 8:00 AM
+
 const TIME_SLOTS = [
-  { id: "09-11", label: "09:00 - 11:00", sublabel: "Mañana" },
-  { id: "11-13", label: "11:00 - 13:00", sublabel: "Almuerzo" },
-  { id: "14-16", label: "14:00 - 16:00", sublabel: "Tarde" },
-  { id: "16-18", label: "16:00 - 18:00", sublabel: "Final del día" },
+  { id: "morning", label: "11:30", sublabel: "Mañana" },
+  { id: "evening", label: "17:30", sublabel: "Tarde" },
 ];
 
 const LABEL_MAP: Record<string, string> = {
@@ -114,10 +118,13 @@ function AddAddressForm({
 export default function CheckoutPage() {
   const [step, setStep] = useState(1);
   const [deliveryDate, setDeliveryDate] = useState<"today" | "tomorrow">("today");
-  const [timeSlot, setTimeSlot] = useState("09-11");
+  const [timeSlot, setTimeSlot] = useState("morning");
+  const [isPastCutoff, setIsPastCutoff] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentReady, setPaymentReady] = useState(false);
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [addAddrSelectedSchoolId, setAddAddrSelectedSchoolId] = useState("");
   const [addAddrSchoolName, setAddAddrSchoolName] = useState("");
@@ -130,6 +137,12 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     getSchools().then((data) => setSchools(data));
+    // Cutoff logic: if past 8am, force "Mañana"
+    const now = new Date();
+    if (now.getHours() >= CUTOFF_HOUR) {
+      setIsPastCutoff(true);
+      setDeliveryDate("tomorrow");
+    }
   }, []);
 
   const { items, getSubtotal, getTotal, isSubscription, clearCart } = useCartStore();
@@ -177,15 +190,36 @@ export default function CheckoutPage() {
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId);
   const hasAddress = selectedAddressId && selectedAddress;
 
-  const handleConfirm = async () => {
+  // Create Payment Intent when entering Step 3
+  const initPaymentIntent = useCallback(async () => {
+    if (clientSecret) return;
+    try {
+      const res = await fetch("/api/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: total,
+          metadata: {
+            deliveryDate,
+            timeSlot,
+            addressId: selectedAddressId || "",
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.clientSecret) {
+        setClientSecret(data.clientSecret);
+      } else {
+        setError("Error al iniciar el pago");
+      }
+    } catch {
+      setError("Error al conectar con el procesador de pago");
+    }
+  }, [total, deliveryDate, timeSlot, selectedAddressId, clientSecret]);
+
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
     setLoading(true);
     setError(null);
-
-    if (!hasAddress) {
-      setError("Selecciona una dirección de entrega");
-      setLoading(false);
-      return;
-    }
 
     const date = new Date();
     if (deliveryDate === "tomorrow") date.setDate(date.getDate() + 1);
@@ -372,12 +406,27 @@ export default function CheckoutPage() {
         {step === 2 && (
           <section>
             <h3 className="text-xl font-bold mb-3">¿Cuándo entregar?</h3>
+
+            {isPastCutoff && (
+              <div className="flex items-center gap-2 mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <span className="material-symbols-outlined text-amber-600 dark:text-amber-400" style={{ fontSize: 20 }}>schedule</span>
+                <p className="text-amber-800 dark:text-amber-200 text-sm font-medium">
+                  Pedidos después de las 8:00 AM se entregan mañana.
+                </p>
+              </div>
+            )}
+
             <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-lg w-fit mb-4">
               <button
                 type="button"
-                onClick={() => setDeliveryDate("today")}
-                className={`px-4 py-1.5 rounded-md text-sm font-semibold ${
-                  deliveryDate === "today" ? "bg-white dark:bg-surface-dark shadow-sm" : "text-slate-500"
+                onClick={() => !isPastCutoff && setDeliveryDate("today")}
+                disabled={isPastCutoff}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                  isPastCutoff
+                    ? "text-slate-400 dark:text-slate-600 cursor-not-allowed line-through"
+                    : deliveryDate === "today"
+                      ? "bg-white dark:bg-surface-dark shadow-sm"
+                      : "text-slate-500"
                 }`}
               >
                 Hoy
@@ -385,27 +434,29 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={() => setDeliveryDate("tomorrow")}
-                className={`px-4 py-1.5 text-sm font-medium ${
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${
                   deliveryDate === "tomorrow" ? "bg-white dark:bg-surface-dark shadow-sm" : "text-slate-500"
                 }`}
               >
                 Mañana
               </button>
             </div>
+
+            <h4 className="text-sm font-bold mb-3 text-text-sec-light dark:text-text-sec-dark">Horario de entrega</h4>
             <div className="grid grid-cols-2 gap-3">
               {TIME_SLOTS.map((slot) => (
                 <button
                   key={slot.id}
                   type="button"
                   onClick={() => setTimeSlot(slot.id)}
-                  className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                  className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
                     timeSlot === slot.id
                       ? "border-primary bg-primary/10"
                       : "border-gray-200 dark:border-gray-700"
                   }`}
                 >
-                  <span className="text-sm font-bold">{slot.label}</span>
-                  <span className="text-xs opacity-75">{slot.sublabel}</span>
+                  <span className="text-lg font-bold">{slot.label}</span>
+                  <span className="text-xs font-medium opacity-75">{slot.sublabel}</span>
                 </button>
               ))}
             </div>
@@ -414,25 +465,40 @@ export default function CheckoutPage() {
 
         {step === 3 && (
           <section>
-            <h3 className="text-xl font-bold mb-3">¿Cómo pagar?</h3>
-            <div className="space-y-3">
-              <label className="flex items-center justify-between p-4 rounded-xl border-2 border-primary bg-white dark:bg-surface-dark cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className="size-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                    <span className="material-symbols-outlined">credit_card</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">Pago en efectivo / transferencia</p>
-                    <p className="text-xs text-slate-500">Pagar al recibir (próximamente Stripe)</p>
-                  </div>
-                </div>
-                <div className="size-5 rounded-full border-[6px] border-primary bg-white" />
-                <input type="radio" name="payment" defaultChecked className="sr-only" />
-              </label>
-            </div>
-            <div className="flex items-center gap-2 mt-3 text-slate-400">
+            <h3 className="text-xl font-bold mb-3">Pago con tarjeta</h3>
+            {clientSecret ? (
+              <Elements
+                stripe={stripePromise}
+                options={{
+                  clientSecret,
+                  appearance: {
+                    theme: "stripe",
+                    variables: {
+                      colorPrimary: "#22c55e",
+                      borderRadius: "12px",
+                      fontFamily: "system-ui, sans-serif",
+                    },
+                  },
+                  locale: "es",
+                }}
+              >
+                <StripeCheckoutForm
+                  onSuccess={handlePaymentSuccess}
+                  onError={(msg) => setError(msg)}
+                  loading={loading}
+                  setLoading={setLoading}
+                  total={total}
+                />
+              </Elements>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin size-6 border-2 border-primary border-t-transparent rounded-full" />
+                <span className="ml-3 text-sm text-slate-500">Conectando con el procesador de pago...</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-4 text-slate-400">
               <span className="material-symbols-outlined text-sm">verified_user</span>
-              <p className="text-xs font-medium">Tus datos están protegidos y encriptados.</p>
+              <p className="text-xs font-medium">Pago seguro procesado por Stripe. Tus datos están encriptados.</p>
             </div>
           </section>
         )}
@@ -473,7 +539,11 @@ export default function CheckoutPage() {
                 Atrás
               </Button>
               <Button
-                onClick={() => setStep((s) => Math.min(3, s + 1))}
+                onClick={() => {
+                  const nextStep = Math.min(3, step + 1);
+                  setStep(nextStep);
+                  if (nextStep === 3) initPaymentIntent();
+                }}
                 className="flex-1"
                 disabled={step === 1 && !hasAddress}
               >
@@ -484,24 +554,83 @@ export default function CheckoutPage() {
             <>
               <div className="flex flex-col">
                 <p className="text-xs text-slate-500 font-medium">Total a pagar</p>
-                <p className="text-xl font-bold">${total.toFixed(2)}</p>
+                <p className="text-xl font-bold">${total.toFixed(2)} MXN</p>
               </div>
-              <Button
-                onClick={handleConfirm}
-                disabled={loading || !hasAddress}
-                className="flex-1"
-              >
-                {loading ? "Procesando..." : (
-                  <>
-                    Confirmar Pedido
-                    <span className="material-symbols-outlined ml-2">check</span>
-                  </>
-                )}
-              </Button>
             </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+// Stripe checkout sub-component (must be inside Elements provider)
+function StripeCheckoutForm({
+  onSuccess,
+  onError,
+  loading,
+  setLoading,
+  total,
+}: {
+  onSuccess: (paymentIntentId: string) => void;
+  onError: (msg: string) => void;
+  loading: boolean;
+  setLoading: (v: boolean) => void;
+  total: number;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [ready, setReady] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setLoading(true);
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+
+    if (error) {
+      onError(error.message || "Error al procesar el pago");
+      setLoading(false);
+    } else if (paymentIntent && paymentIntent.status === "succeeded") {
+      onSuccess(paymentIntent.id);
+    } else {
+      onError("El pago no se completó. Intenta de nuevo.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div className="bg-white dark:bg-surface-dark rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <PaymentElement
+          onReady={() => setReady(true)}
+          options={{
+            layout: "tabs",
+          }}
+        />
+      </div>
+      <Button
+        type="submit"
+        disabled={!stripe || !ready || loading}
+        className="w-full mt-4 py-3"
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <span className="animate-spin size-4 border-2 border-white border-t-transparent rounded-full" />
+            Procesando pago...
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>lock</span>
+            Pagar ${total.toFixed(2)} MXN
+          </span>
+        )}
+      </Button>
+    </form>
   );
 }

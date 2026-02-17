@@ -55,4 +55,11 @@ export async function updateProduct(id: string, data: Partial<NewProduct>) {
     return updatedProduct;
 }
 
-
+export async function toggleProductAvailability(id: string, isAvailable: boolean) {
+    const [updatedProduct] = await db
+        .update(products)
+        .set({ isAvailable, updatedAt: new Date() })
+        .where(eq(products.id, id))
+        .returning();
+    return updatedProduct;
+}

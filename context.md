@@ -81,11 +81,11 @@ _Do not waste resources suggesting or implementing these. These are explicit "Ti
 
 - [x] User can Register & Login.
 - [x] User can complete the Core Flow (Onboarding → Menú → Carrito → Checkout).
-- [ ] **Inventory Lock:** El sistema impide comprar si el stock del día llega a 0.
-- [ ] **Cutoff Logic:** El Checkout bloquea visualmente la selección de "Hoy" si son las 8:01 AM.
-- [ ] **School Selection:** El onboarding obliga a elegir una escuela válida de la base de datos.
-- [ ] Stripe Payments active (Test Mode) — actualmente pago en efectivo/transferencia.
-- [ ] Dashboard Admin: vista pedidos pendientes/terminados + Excel descargable.
+- [x] **Product Visibility:** Admin controla qué loncheras se muestran con toggle show/hide.
+- [x] **Cutoff Logic:** El Checkout bloquea visualmente la selección de "Hoy" si son las 8:01 AM.
+- [x] **School Selection:** El onboarding y checkout usan dropdown de escuelas de la DB.
+- [x] Stripe Payments active (Sandbox/Test Mode) — integrado con PaymentElement.
+- [x] Dashboard Admin: vista pedidos pendientes/terminados + Excel descargable.
 - [ ] Critical bugs resolved.
 
 ---
@@ -206,17 +206,22 @@ _Update this section at the start of every coding session._
 - [x] **Middleware:** Protege `/checkout`, `/orders`, `/profile`, `/admin` (Clerk Middleware).
 - [x] **Layout Shop:** Exige niño + dirección en DB para menú, carrito, pedidos.
 - [x] **Auth Migration (Supabase → Clerk):**
-  - [x] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase` — *En proceso: eliminado de vistas principales*).
+  - [x] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase`, `supabase/`, `dev-auto-login` — Completado).
   - [x] Instalar `@clerk/nextjs` e integrar `<ClerkProvider>` en `layout.tsx`.
   - [x] Configurar Middleware con `clerkMiddleware()` para proteger rutas (`/menu`, `/checkout`, `/admin`).
   - [x] Configurar redirecciones post-login (Google/Email) y rutas catch-all (`[[...]]`).
 - [x] **DB Migration (Supabase → Neon):**
   - [x] Actualizar `DATABASE_URL` en `.env` con connection string de Neon.
   - [x] Verificar compatibilidad de Drizzle con `postgres.js` (Confirmado).
-- [ ] **Storage Migration (Supabase → R2):**
-  - [x] Instalar `@aws-sdk/client-s3`.
-  - [x] Crear cliente S3 compatible con R2 en `src/lib/r2.ts` (Listo).
-  - [x] Actualizar `next.config.ts` para permitir dominios de imágenes de R2 (Listo).
+- [x] **Storage Migration (Supabase → R2):**
+  - [x] Instalar `@aws-sdk/client-s3` y `@aws-sdk/s3-request-presigner`.
+  - [x] Crear cliente S3 compatible con R2 en `src/lib/r2.ts`.
+  - [x] Actualizar `next.config.ts` para permitir dominios de imágenes de R2.
+  - [x] Crear Server Action para presigned URLs (`src/actions/storage.ts`).
+  - [x] Crear componente `ImageUpload` (`src/components/ui/image-upload.tsx`).
+  - [x] Integrar subida de imágenes en formulario Admin de productos.
+  - [x] Configurar CORS en bucket R2 (`kinderbites`).
+  - [x] Limpiar variables de entorno y dependencias legacy de Supabase.
 
 ### 🟢 Phase 2: Core Feature — Tienda (implementado)
 
@@ -229,20 +234,24 @@ _Update this section at the start of every coding session._
 - [x] **Creación de pedido:** orders + order_items.
 - [x] **Email de confirmación:** Resend tras crear pedido.
 
-### 🟡 Phase 3: Admin / Dashboard (parcial)
+### 🟢 Phase 3: Admin / Dashboard (implementado)
 
 **Scope:**
 
 - [x] **CRUD productos:** Crear, editar, listar loncheras con imágenes.
-- [ ] **Loncheras disponibles de la semana:** [por definir — ¿productos por fecha? ¿menú semanal?]
-- [ ] **Vista de pedidos:** Pendientes y terminados en dashboard admin.
-- [ ] **Excel descargable:** Pedidos del día a corte 8am.
+- [x] **Visibilidad de productos:** Toggle show/hide desde admin para controlar qué loncheras se muestran en el menú.
+- [x] **Vista de pedidos:** Pendientes y terminados en dashboard admin con cambio de estado.
+- [x] **Excel descargable:** Pedidos del día exportables a `.xlsx` con formato profesional.
+- [x] **Rol admin:** Protección con Clerk `publicMetadata.role === "admin"`.
+- [x] **Navegación admin:** Barra superior con links a Productos y Pedidos.
 
-### 🟡 Phase 4: Regla de corte 8am (pendiente)
+### 🟢 Phase 4: Regla de corte 8am (implementado)
 
 **Scope:**
 
-- [ ] **Validación en checkout:** Si hora actual > 8:00am, deshabilitar opción "Hoy" y permitir solo "Mañana".
+- [x] **Validación en checkout:** Si hora actual > 8:00am, deshabilitar opción "Hoy" y permitir solo "Mañana".
+- [x] **Time slots reales:** 11:30 (Mañana) y 17:30 (Tarde) en lugar de slots genéricos.
+- [x] **Warning badge:** Aviso visual "Pedidos después de las 8:00 AM se entregan mañana."
 
 ---
 
@@ -250,8 +259,8 @@ _Update this section at the start of every coding session._
 
 _Features planned for later versions. Do not implement yet._
 
-- [ ] Stripe activo en checkout (actualmente pago en efectivo/transferencia).
-- [ ] Rol admin diferenciado (actualmente cualquier usuario autenticado puede acceder a `/admin`).
+- [x] ~~Stripe activo en checkout~~ (integrado con Stripe Sandbox / PaymentElement).
+- [x] ~~Rol admin diferenciado~~ (implementado con Clerk publicMetadata).
 - [ ] Multi-idioma ampliado.
 - [ ] Persistencia del carrito (localStorage o DB).
 
