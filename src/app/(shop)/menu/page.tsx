@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
 import { useProducts } from "@/hooks/use-products";
 import { useCartStore } from "@/store/cart-store";
 import { useChildren } from "@/hooks/use-children";
@@ -22,6 +23,7 @@ export default function MenuPage() {
   const { products, isLoading, error } = useProducts(activeCategory ?? undefined);
   const { addItem, getItemCount } = useCartStore();
   const { children } = useChildren();
+  const { user } = useUser();
 
   const filteredProducts = search
     ? products.filter(
@@ -36,13 +38,23 @@ export default function MenuPage() {
       {/* Header */}
       <header className="flex items-center justify-between p-5 pt-8 bg-background-light dark:bg-background-dark sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div className="relative size-10 rounded-full bg-gray-200 border-2 border-primary" />
+          {user?.imageUrl ? (
+            <Image
+              src={user.imageUrl}
+              alt={user.firstName || "Perfil"}
+              width={40}
+              height={40}
+              className="size-10 rounded-full border-2 border-primary object-cover"
+            />
+          ) : (
+            <div className="relative size-10 rounded-full bg-gray-200 border-2 border-primary" />
+          )}
           <div>
             <p className="text-xs font-medium text-text-sec-light dark:text-text-sec-dark">
               Bienvenida de nuevo
             </p>
             <h2 className="text-text-main-light dark:text-text-main-dark text-lg font-bold">
-              Hola!
+              Hola{user?.firstName ? `, ${user.firstName}` : ""}!
             </h2>
           </div>
         </div>
