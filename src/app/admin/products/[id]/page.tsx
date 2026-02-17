@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImageUpload } from "@/components/ui/image-upload";
 import { getProduct, updateProduct } from "@/actions/products";
 
 const schema = z.object({
@@ -40,6 +41,8 @@ export default function EditProductPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -144,9 +147,11 @@ export default function EditProductPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">URL de Imagen</label>
-             <Input {...register("imageUrl")} placeholder="https://..." />
-             <p className="text-xs text-slate-500 mt-1">Carga de archivos deshabilitada temporalmente por migración.</p>
+            <label className="block text-sm font-medium mb-2">Imagen del producto</label>
+             <ImageUpload
+               value={watch("imageUrl")}
+               onChange={(url) => setValue("imageUrl", url)}
+             />
           </div>
 
           <div>
