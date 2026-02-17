@@ -9,6 +9,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createProduct } from "@/actions/products";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 const schema = z.object({
   name: z.string().min(1, "Nombre requerido"),
@@ -34,6 +35,8 @@ export default function NewProductPage() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -45,6 +48,8 @@ export default function NewProductPage() {
     },
   });
 
+  const imageUrl = watch("imageUrl");
+
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setError(null);
@@ -53,11 +58,11 @@ export default function NewProductPage() {
       await createProduct({
         name: data.name,
         description: data.description || null,
-        price: data.price.toString(),
+        price: data.price.toFixed(2),
         imageUrl: data.imageUrl || null,
         category: data.category,
         ageRange: data.ageRange || null,
-        netWeightG: data.netWeightG ? data.netWeightG.toString() : null,
+        netWeightG: data.netWeightG ? data.netWeightG.toFixed(2) : null,
         preparation: data.preparation || null,
         isOrganic: data.isOrganic,
         isGlutenFree: data.isGlutenFree,
@@ -85,9 +90,11 @@ export default function NewProductPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">URL de Imagen</label>
-             <Input {...register("imageUrl")} placeholder="https://..." />
-             <p className="text-xs text-slate-500 mt-1">Carga de archivos deshabilitada temporalmente por migración.</p>
+            <label className="block text-sm font-medium mb-2">Imagen del Producto</label>
+            <ImageUpload 
+              value={imageUrl}
+              onChange={(url) => setValue("imageUrl", url, { shouldValidate: true })} 
+            />
           </div>
 
           <div>

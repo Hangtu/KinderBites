@@ -209,15 +209,14 @@ _Update this section at the start of every coding session._
   - [x] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase` — *En proceso: eliminado de vistas principales*).
   - [x] Instalar `@clerk/nextjs` e integrar `<ClerkProvider>` en `layout.tsx`.
   - [x] Configurar Middleware con `clerkMiddleware()` para proteger rutas (`/menu`, `/checkout`, `/admin`).
-  - [ ] Habilitar Google One Tap en Clerk Dashboard + Componente (Pendiente).
+  - [x] Configurar redirecciones post-login (Google/Email) y rutas catch-all (`[[...]]`).
 - [x] **DB Migration (Supabase → Neon):**
   - [x] Actualizar `DATABASE_URL` en `.env` con connection string de Neon.
-  - [x] Verificar compatibilidad de Drizzle con `postgres.js` o `neondatabase/serverless` (Usando `postgres.js`).
-  -
+  - [x] Verificar compatibilidad de Drizzle con `postgres.js` (Confirmado).
 - [ ] **Storage Migration (Supabase → R2):**
   - [x] Instalar `@aws-sdk/client-s3`.
-  - [ ] Crear cliente S3 compatible con R2 en `src/lib/r2.ts` (Pendiente integración final).
-  - [ ] Actualizar `next.config.ts` para permitir dominios de imágenes de R2 (Pendiente).
+  - [x] Crear cliente S3 compatible con R2 en `src/lib/r2.ts` (Listo).
+  - [x] Actualizar `next.config.ts` para permitir dominios de imágenes de R2 (Listo).
 
 ### 🟢 Phase 2: Core Feature — Tienda (implementado)
 
