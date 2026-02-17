@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/server";
+import { db } from "@/lib/db";
+import { orders } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const LABEL_MAP: Record<string, string> = {
   school: "Escuela",
@@ -16,7 +18,7 @@ export default async function CheckoutSuccessPage({
   const params = await searchParams;
   const orderId = params.orderId;
 
-  let order: Awaited<ReturnType<typeof fetchOrder>> = null;
+  let order: Awaited<ReturnType<typeof fetchOrder>> = undefined;
   if (orderId) {
     order = await fetchOrder(orderId);
   }
@@ -39,34 +41,34 @@ export default async function CheckoutSuccessPage({
       {order && (
         <div className="w-full max-w-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark p-4 space-y-4">
           <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">Resumen</h3>
-          {order.order_items?.map((item: any) => (
+          {order.orderItems?.map((item: any) => (
             <div key={item.id} className="flex justify-between text-sm">
               <span>
-                {item.quantity}x {item.products?.name}
-                {item.children?.name && (
-                  <span className="text-slate-500"> ({item.children.name})</span>
+                {item.quantity}x {item.product?.name}
+                {item.child?.name && (
+                  <span className="text-slate-500"> ({item.child.name})</span>
                 )}
               </span>
               <span className="font-medium">
-                ${(Number(item.unit_price) * item.quantity).toFixed(2)}
+                ${(Number(item.unitPrice) * item.quantity).toFixed(2)}
               </span>
             </div>
           ))}
-          {order.delivery_addresses && (
+          {order.deliveryAddress && (
             <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
               <p className="text-xs text-slate-500 mb-1">Entregar en</p>
               <p className="text-sm font-medium">
-                {LABEL_MAP[order.delivery_addresses.label] || order.delivery_addresses.label}:{" "}
-                {order.delivery_addresses.address}
+                {LABEL_MAP[order.deliveryAddress.label] || order.deliveryAddress.label}:{" "}
+                {order.deliveryAddress.address}
               </p>
-              {order.delivery_addresses.school_name && (
-                <p className="text-xs text-slate-500">{order.delivery_addresses.school_name}</p>
+              {order.deliveryAddress.schoolName && (
+                <p className="text-xs text-slate-500">{order.deliveryAddress.schoolName}</p>
               )}
             </div>
           )}
           <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between font-bold">
             <span>Total</span>
-            <span>${Number(order.total_amount).toFixed(2)}</span>
+            <span>${Number(order.totalAmount).toFixed(2)}</span>
           </div>
         </div>
       )}
@@ -84,20 +86,17 @@ export default async function CheckoutSuccessPage({
 }
 
 async function fetchOrder(orderId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("orders")
-    .select(`
-      *,
-      order_items (
-        quantity,
-        unit_price,
-        products (name),
-        children (name)
-      ),
-      delivery_addresses (label, address, school_name)
-    `)
-    .eq("id", orderId)
-    .single();
+  const data = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: {
+      orderItems: {
+        with: {
+          product: true,
+          child: true,
+        },
+      },
+      deliveryAddress: true,
+    },
+  });
   return data;
 }

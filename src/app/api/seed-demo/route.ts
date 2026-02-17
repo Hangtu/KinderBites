@@ -1,5 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { children, deliveryAddresses } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * POST /api/seed-demo
@@ -7,56 +10,51 @@ import { NextResponse } from "next/server";
  * Útil para testing local sin completar onboarding manualmente.
  */
 export async function POST() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await auth();
 
-  if (!user) {
+  if (!userId) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { count: childrenCount } = await supabase
-    .from("children")
-    .select("id", { count: "exact", head: true })
-    .eq("parent_id", user.id);
+  const existingChildren = await db.query.children.findMany({
+    where: eq(children.parentId, userId),
+  });
 
-  if ((childrenCount ?? 0) === 0) {
-    const { error: childError } = await supabase.from("children").insert({
-      parent_id: user.id,
-      name: "Mateo (demo)",
-      school_name: "Guardería Mis Primeros Pasos",
-      grade: "Kinder",
-      allergy_ids: ["dairy"],
-      avoided_foods: ["Brócoli"],
-    });
-    if (childError) {
+  if (existingChildren.length === 0) {
+    try {
+      await db.insert(children).values({
+        parentId: userId,
+        name: "Mateo (demo)",
+        schoolName: "Guardería Mis Primeros Pasos",
+        grade: "Kinder",
+        allergyIds: ["dairy"],
+        avoidedFoods: ["Brócoli"],
+      });
+    } catch (e: any) {
       return NextResponse.json(
-        { error: "Error al crear niño demo: " + childError.message },
+        { error: "Error al crear niño demo: " + e.message },
         { status: 500 }
       );
     }
   }
 
-  const { count: addrCount } = await supabase
-    .from("delivery_addresses")
-    .select("id", { count: "exact", head: true })
-    .eq("profile_id", user.id);
+  const existingAddresses = await db.query.deliveryAddresses.findMany({
+    where: eq(deliveryAddresses.profileId, userId),
+  });
 
-  if ((addrCount ?? 0) === 0) {
-    const { error: addrError } = await supabase
-      .from("delivery_addresses")
-      .insert({
-        profile_id: user.id,
+  if (existingAddresses.length === 0) {
+    try {
+      await db.insert(deliveryAddresses).values({
+        profileId: userId,
         label: "school",
         address: "Av. Principal 123, Col. Centro",
-        school_name: "Guardería Mis Primeros Pasos",
-        preferred_time_slot: "11:30",
-        is_default: true,
+        schoolName: "Guardería Mis Primeros Pasos",
+        preferredTimeSlot: "11:30",
+        isDefault: true,
       });
-    if (addrError) {
+    } catch (e: any) {
       return NextResponse.json(
-        { error: "Error al crear dirección demo: " + addrError.message },
+        { error: "Error al crear dirección demo: " + e.message },
         { status: 500 }
       );
     }

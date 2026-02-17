@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getOrder, cancelOrder } from "@/actions/orders";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
@@ -17,28 +17,15 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function OrderDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [cancelling, setCancelling] = useState(false);
   const { data: order, error, mutate } = useSWR(
     id ? `order-${id}` : null,
     async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items (
-            quantity,
-            unit_price,
-            specific_notes,
-            products (name, image_url, price),
-            children (name)
-          )
-        `)
-        .eq("id", id)
-        .single();
-      if (error) throw error;
+      if (!id) return null;
+      const data = await getOrder(id);
       return data;
     }
   );
@@ -46,16 +33,19 @@ export default function OrderDetailPage() {
   const handleCancel = async () => {
     if (!order || order.status !== "pending" || !confirm("¿Cancelar este pedido?")) return;
     setCancelling(true);
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update({ status: "cancelled" })
-      .eq("id", id);
-    setCancelling(false);
-    if (!updateError) await mutate();
+    try {
+      await cancelOrder(id);
+      await mutate();
+      router.refresh();
+    } catch (err) {
+      console.error(err);
+      alert("Error al cancelar pedido");
+    } finally {
+      setCancelling(false);
+    }
   };
 
-  if (error || (!order && id)) {
+  if (error || (!order && id && !error && order === null)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-slate-500">Pedido no encontrado</p>
@@ -109,7 +99,7 @@ export default function OrderDetailPage() {
 
       <div className="p-6 space-y-6">
         <div className="space-y-2">
-          {order.order_items?.map((item: any) => (
+          {order.orderItems?.map((item: any) => (
             <div
               key={item.id}
               className="flex gap-4 p-4 bg-white dark:bg-surface-dark rounded-xl"
@@ -117,26 +107,26 @@ export default function OrderDetailPage() {
               <div
                 className="size-16 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 bg-cover bg-center"
                 style={
-                  item.products?.image_url
-                    ? { backgroundImage: `url(${item.products.image_url})` }
+                  item.product?.imageUrl
+                    ? { backgroundImage: `url(${item.product.imageUrl})` }
                     : {}
                 }
               >
-                {!item.products?.image_url && (
+                {!item.product?.imageUrl && (
                   <div className="w-full h-full flex items-center justify-center text-2xl">
                     🍽️
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <p className="font-bold">{item.products?.name}</p>
+                <p className="font-bold">{item.product?.name}</p>
                 <p className="text-sm text-slate-500">
-                  {item.quantity} x ${Number(item.unit_price).toFixed(2)} •{" "}
-                  {item.children?.name}
+                  {item.quantity} x ${Number(item.unitPrice).toFixed(2)} •{" "}
+                  {item.child?.name}
                 </p>
               </div>
               <p className="font-bold">
-                ${(Number(item.unit_price) * item.quantity).toFixed(2)}
+                ${(Number(item.unitPrice) * item.quantity).toFixed(2)}
               </p>
             </div>
           ))}
@@ -153,7 +143,7 @@ export default function OrderDetailPage() {
           </div>
           <div className="flex justify-between font-bold text-lg mt-4">
             <span>Total</span>
-            <span>${Number(order.total_amount).toFixed(2)}</span>
+            <span>${Number(order.totalAmount).toFixed(2)}</span>
           </div>
         </div>
       </div>

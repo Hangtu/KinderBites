@@ -3,9 +3,12 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { useOnboardingStore } from "@/store/onboarding-store";
+import { getSchools } from "@/actions/schools";
+import { getAddress, updateAddress, createAddress } from "@/actions/addresses";
+import { createChild } from "@/actions/children";
 
 const DELIVERY_SLOTS = [
   { id: "morning", label: "Antes del almuerzo", sublabel: "Recomendado: 11:30 AM", icon: "wb_sunny" },
@@ -27,17 +30,12 @@ function OnboardingAddressPageInner() {
   const [loading, setLoading] = useState(false);
   const [loadingAddr, setLoadingAddr] = useState(!!editId);
   const router = useRouter();
-  const supabase = createClient();
+  const { user } = useUser();
   const { child: storedChild, address: storedAddress, setAddress: setStoredAddress } = useOnboardingStore();
 
   useEffect(() => {
-    supabase
-      .from("schools")
-      .select("id, name, address")
-      .eq("is_available", true)
-      .order("name")
-      .then(({ data }) => setSchools(data ?? []));
-  }, [supabase]);
+    getSchools().then((data) => setSchools(data));
+  }, []);
 
   useEffect(() => {
     if (schools.length > 0 && storedAddress?.schoolName && !selectedSchoolId) {
@@ -51,18 +49,19 @@ function OnboardingAddressPageInner() {
   useEffect(() => {
     if (editId) {
       (async () => {
-        const { data, error } = await supabase
-          .from("delivery_addresses")
-          .select("*")
-          .eq("id", editId)
-          .single();
-        setLoadingAddr(false);
-        if (error || !data) return;
-        setSchoolName(data.school_name ?? "");
-        setAddress(data.address ?? "");
-        if (data.school_id) setSelectedSchoolId(data.school_id);
-        const slot = data.preferred_time_slot === "17:30" ? "evening" : "morning";
-        setTimeSlot(slot);
+        try {
+          const data = await getAddress(editId);
+          setLoadingAddr(false);
+          if (!data) return;
+          setSchoolName(data.schoolName ?? "");
+          setAddress(data.address ?? "");
+          if (data.schoolId) setSelectedSchoolId(data.schoolId);
+          const slot = data.preferredTimeSlot === "17:30" ? "evening" : "morning";
+          setTimeSlot(slot);
+        } catch (err) {
+          console.error(err);
+          setLoadingAddr(false);
+        }
       })();
     } else if (storedAddress) {
       setSchoolName(storedAddress.schoolName);
@@ -72,7 +71,7 @@ function OnboardingAddressPageInner() {
     } else {
       setLoadingAddr(false);
     }
-  }, [editId, storedAddress, supabase]);
+  }, [editId, storedAddress]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,34 +79,28 @@ function OnboardingAddressPageInner() {
     const preferredSlot = timeSlot === "morning" ? "11:30" : "17:30";
 
     if (isEdit && editId) {
-      // Edición siempre requiere usuario
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login?redirect=/profile/addresses");
         setLoading(false);
         return;
       }
 
-      const { error } = await supabase
-        .from("delivery_addresses")
-        .update({
+      try {
+        await updateAddress(editId, {
           label: "school",
           address,
-          school_id: selectedSchoolId || null,
-          school_name: schoolName || null,
-          preferred_time_slot: preferredSlot,
-        })
-        .eq("id", editId);
+          schoolId: selectedSchoolId || null,
+          schoolName: schoolName || null,
+          preferredTimeSlot: preferredSlot,
+        });
 
-      setLoading(false);
-      if (error) {
+        router.push("/profile/addresses");
+        router.refresh();
+      } catch (error) {
         console.error(error);
-        return;
+      } finally {
+        setLoading(false);
       }
-      router.push("/profile/addresses");
-      router.refresh();
       return;
     }
 
@@ -121,41 +114,28 @@ function OnboardingAddressPageInner() {
     setStoredAddress(addressData);
 
     // Si el usuario está logueado, persistir niño + dirección en DB antes de ir al menú
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
     if (user && storedChild) {
-      const { error: childError } = await supabase
-        .from("children")
-        .insert({
-          parent_id: user.id,
+      try {
+        await createChild({
           name: storedChild.name,
-          birth_date: storedChild.birthDate || null,
-          school_name: storedChild.schoolName ?? "",
+          birthDate: storedChild.birthDate || null,
+          schoolName: storedChild.schoolName ?? "",
           grade: storedChild.grade ?? "",
-          allergy_ids: storedChild.allergyIds ?? [],
-          avoided_foods: storedChild.avoidedFoods ?? [],
-          special_notes: storedChild.specialNotes ?? null,
+          allergyIds: storedChild.allergyIds ?? [],
+          avoidedFoods: storedChild.avoidedFoods ?? [],
+          specialNotes: storedChild.specialNotes ?? null,
         });
 
-      if (childError) {
-        console.error("Error al crear niño:", childError);
-        setLoading(false);
-        return;
-      }
-
-      const { error: addrError } = await supabase.from("delivery_addresses").insert({
-        profile_id: user.id,
-        label: "school",
-        address,
-        school_id: selectedSchoolId || null,
-        school_name: schoolName || null,
-        preferred_time_slot: preferredSlot,
-        is_default: true,
-      });
-
-      if (addrError) {
-        console.error("Error al crear dirección:", addrError);
+        await createAddress({
+          label: "school",
+          address,
+          schoolId: selectedSchoolId || null,
+          schoolName: schoolName || null,
+          preferredTimeSlot: preferredSlot,
+          isDefault: true,
+        });
+      } catch (err: any) {
+        console.error("Error al persistir datos:", err);
         setLoading(false);
         return;
       }

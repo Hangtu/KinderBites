@@ -54,12 +54,12 @@ export default function ProfileAddressesPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold">{LABEL_MAP[addr.label] || addr.label}</h3>
                 <p className="text-sm text-slate-500 break-words">{addr.address}</p>
-                {addr.school_name && (
-                  <p className="text-sm text-slate-500 mt-1">{addr.school_name}</p>
+                {addr.schoolName && (
+                  <p className="text-sm text-slate-500 mt-1">{addr.schoolName}</p>
                 )}
-                {addr.preferred_time_slot && (
+                {addr.preferredTimeSlot && (
                   <p className="text-xs text-slate-400 mt-1">
-                    Horario: {addr.preferred_time_slot}
+                    Horario: {addr.preferredTimeSlot}
                   </p>
                 )}
               </div>

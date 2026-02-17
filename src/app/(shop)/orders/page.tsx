@@ -2,23 +2,11 @@
 
 import Link from "next/link";
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getOrders } from "@/actions/orders";
 
 const fetcher = async () => {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(`
-      *,
-      order_items (
-        quantity,
-        unit_price,
-        products (name, image_url)
-      )
-    `)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  const data = await getOrders();
   return data ?? [];
 };
 
@@ -80,7 +68,7 @@ export default function OrdersPage() {
             <div className="p-4 bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-start mb-2">
                 <span className="text-sm text-slate-500">
-                  {new Date(order.created_at).toLocaleDateString("es", {
+                  {new Date(order.createdAt).toLocaleDateString("es", {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
@@ -100,9 +88,9 @@ export default function OrdersPage() {
                   {STATUS_LABELS[order.status] ?? order.status}
                 </span>
               </div>
-              <p className="font-bold text-lg">${Number(order.total_amount).toFixed(2)}</p>
+              <p className="font-bold text-lg">${Number(order.totalAmount).toFixed(2)}</p>
               <p className="text-sm text-slate-500">
-                {order.order_items?.length ?? 0} producto(s)
+                {order.orderItems?.length ?? 0} producto(s)
               </p>
             </div>
           </Link>

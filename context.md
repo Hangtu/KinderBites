@@ -22,7 +22,7 @@ Before answering ANY query, generating code, or analyzing logic, you MUST:
 - **Scope (YAGNI):** Implement only what is requested. If you see an important related improvement, always propose it (do not implement without confirmation).
 - **Tests:** Write tests only when explicitly requested.
 - **Clarification:** If the request is ambiguous, ask before implementing. Do not assume.
-- **Documentation:** When flow or architecture changes, update `FLUJO_APP.md`, `README`, and relevant docs accordingly.
+- **Documentation:** When flow or architecture changes, update `context.md`, `README`, and relevant docs accordingly.
 - **Security:** Always prioritize secure code. Consider RLS, auth, validation, and attack prevention in every line and module. Security-first mindset.
 - **Maintenance:** If we complete a feature, remind to update the checkboxes in this file.
 
@@ -38,34 +38,54 @@ If the user says **"PHOENIX"** or **"RESET"**:
 
 ### Core Vision
 
-- **Elevator Pitch:** App para que padres con poco tiempo puedan ordenar loncheras con comida saludable para sus hijos.
-- **Target Audience:** Padres de familia (kinder y primaria).
+- **Elevator Pitch:** Plataforma que permite a padres ocupados delegar la nutrición escolar de sus hijos comprando **loncheras balanceadas visualmente atractivas**, eliminando la culpa y el estrés de la preparación matutina (basado en el Método Lonchera Práctica).
+- **Target Audience:** Padres de familia (Kinder y Primaria) que valoran la nutrición pero carecen de tiempo.
 - **Key Success Metrics (KPIs):**
-  - [por definir]
+  - **Weekly Recurrence Rate:** % de padres que piden para 3+ días de la semana (validación del hábito).
+  - **Waste Rate:** % de comida no vendida (objetivo < 5% mediante stock finito).
+  - **Conversion Rate:** % de visitantes que completan el onboarding (Child + Address).
 
 ### 🚧 Operational Constraints (Grounding)
 
 _Rules that the logic MUST follow strictly._
 
-- **Cutoff 8:00 AM:** Si se ordena después de las 8:00am solo se permite pedido para el día siguiente. Hasta las 8am se permite pedido para el mismo día.
-- **Geography/Localization:** [por definir]
-- **User Permissions:** Admin puede subir loncheras y ver pedidos. Actualmente cualquier usuario autenticado puede acceder a `/admin` (no hay rol "admin" diferenciado).
+- **Cutoff 8:00 AM (Hard Limit):**
+  - Pedidos hechos **antes** de las 8:00 AM → Entrega HOY.
+  - Pedidos hechos **después** de las 8:00 AM → Entrega MAÑANA (o fecha futura).
+  - *Razón:* Logística de cocina y rutas de entrega.
+- **Geography/Localization (School-Locked):**
+  - El servicio **NO** entrega a domicilio.
+  - El servicio entrega **EXCLUSIVAMENTE** a una lista cerrada de "Escuelas Autorizadas".
+  - La dirección de entrega se selecciona de un Dropdown predefinido (no es un campo de texto libre).
+- **The "Bundle" Rule (Product Composition):**
+  - Un producto no es un ítem aislado. Cada "Lonchera" vendida debe respetar la estructura del Método: **Principal (Proteína/Carbo) + Vegetal/Fruta + Snack**.
+- **The "Picky Eater" Logic (Menu Rotation):**
+  - Para reducir la ansiedad de elección (Guía Central pág. 49), el sistema **no debe mostrar más de 3 opciones de menú** por día. (Menos es más).
+- **User Permissions:**
+  - **Padre:** Puede comprar, gestionar perfiles de hijos y ver historial.
+  - **Admin:** Puede crear productos, gestionar escuelas y ver lista de empaquetado del día.
 - **Platform/Device:** Mobile-first Web App (Tailwind, diseño responsive). Desktop es secundario.
 
 ### 🚫 Negative Scope (What we are NOT building)
 
-_Do not waste resources suggesting or implementing these._
+_Do not waste resources suggesting or implementing these. These are explicit "Time Savers"._
 
-- No app nativa iOS/Android (solo Web).
-- [por definir otras exclusiones]
+- **No Customization (Ingredientes):** No permitimos "Sin cebolla" o "Sin tomate". El producto es SKU cerrado para velocidad masiva.
+- **No Home Delivery:** No logística de última milla a casas. Solo "drops" masivos en escuelas.
+- **No "Build Your Own":** El padre no arma la lonchera ítem por ítem. Compra el paquete diseñado por expertos.
+- **No Chat/Social:** No hay comunicación entre padres ni con la cocina dentro de la app.
+- **No App Nativa:** Solo PWA / Web Responsive.
+- **No Historical Analytics:** El padre no necesita ver gráficos de nutrición por ahora.
 
 ### 🏁 MVP Launch Criteria (Definition of Done)
 
 - [x] User can Register & Login.
 - [x] User can complete the Core Flow (Onboarding → Menú → Carrito → Checkout).
+- [ ] **Inventory Lock:** El sistema impide comprar si el stock del día llega a 0.
+- [ ] **Cutoff Logic:** El Checkout bloquea visualmente la selección de "Hoy" si son las 8:01 AM.
+- [ ] **School Selection:** El onboarding obliga a elegir una escuela válida de la base de datos.
 - [ ] Stripe Payments active (Test Mode) — actualmente pago en efectivo/transferencia.
-- [ ] Regla de corte 8am implementada en checkout.
-- [ ] Dashboard admin: vista pedidos pendientes/terminados + Excel descargable.
+- [ ] Dashboard Admin: vista pedidos pendientes/terminados + Excel descargable.
 - [ ] Critical bugs resolved.
 
 ---
@@ -78,10 +98,10 @@ _Use only the tools listed below. Do not introduce new libraries without permiss
 
 - **Frontend:** Next.js 15 (App Router), React 19
 - **Styling:** Tailwind CSS v4, Mobile Fist, componentes UI (button, input, card, etc.), Lucide Icons
-- **Backend/BaaS:** Supabase (Auth, DB, Storage)
-- **Database:** PostgreSQL vía Supabase, ORM Drizzle
+- **Backend/BaaS:** NeonDB (DB), Cloudflare R2 (Storage)
+- **Database:** PostgreSQL vía NeonDB, ORM Drizzle
 - **State Management:** Zustand (carrito, onboarding), SWR (fetching)
-- **Auth:** Supabase Auth
+- **Auth:** Clerk
 - **Forms:** React Hook Form + Zod
 - **Payments:** Stripe (preparado, no activo en checkout)
 - **Email:** Resend (confirmación de pedido)
@@ -184,6 +204,18 @@ _Update this section at the start of every coding session._
 - [x] **Login Screen:** Email/Pass + Registro.
 - [x] **Middleware:** Protege `/checkout`, `/orders`, `/profile`, `/admin`.
 - [x] **Layout Shop:** Exige niño + dirección en DB para menú, carrito, pedidos.
+- [ ] **Auth Migration (Supabase → Clerk):**
+  - [ ] Eliminar dependencias y código de Supabase (`@supabase/*`, `src/lib/supabase`).
+  - [ ] Instalar `@clerk/nextjs` e integrar `<ClerkProvider>` en `layout.tsx`.
+  - [ ] Configurar Middleware con `clerkMiddleware()` para proteger rutas (`/menu`, `/checkout`, `/admin`).
+  - [ ] Habilitar Google One Tap en Clerk Dashboard + Componente.
+- [ ] **DB Migration (Supabase → Neon):**
+  - [ ] Actualizar `DATABASE_URL` en `.env` con connection string de Neon.
+  - [ ] Verificar compatibilidad de Drizzle con `postgres.js` o `neondatabase/serverless` (según necesidad de edge).
+- [ ] **Storage Migration (Supabase → R2):**
+  - [ ] Instalar `@aws-sdk/client-s3`.
+  - [ ] Crear cliente S3 compatible con R2 en `src/lib/r2.ts`.
+  - [ ] Actualizar `next.config.ts` para permitir dominios de imágenes de R2.
 
 ### 🟢 Phase 2: Core Feature — Tienda (implementado)
 

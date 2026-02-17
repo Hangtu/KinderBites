@@ -9,6 +9,8 @@ import {
   date,
   pgEnum,
 } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+
 
 // Enums
 export const addressLabelEnum = pgEnum("address_label", [
@@ -32,7 +34,7 @@ export const orderStatusEnum = pgEnum("order_status", [
 
 // Tables
 export const profiles = pgTable("profiles", {
-  id: uuid("id").primaryKey(),
+  id: text("id").primaryKey(),
   email: text("email").notNull(),
   fullName: text("full_name"),
   avatarUrl: text("avatar_url"),
@@ -53,9 +55,7 @@ export const allergies = pgTable("allergies", {
 
 export const children = pgTable("children", {
   id: uuid("id").primaryKey().defaultRandom(),
-  parentId: uuid("parent_id")
-    .notNull()
-    .references(() => profiles.id, { onDelete: "cascade" }),
+  parentId: text("parent_id").notNull(),
   name: text("name").notNull(),
   birthDate: date("birth_date"),
   schoolName: text("school_name"),
@@ -87,9 +87,7 @@ export const schools = pgTable("schools", {
 
 export const deliveryAddresses = pgTable("delivery_addresses", {
   id: uuid("id").primaryKey().defaultRandom(),
-  profileId: uuid("profile_id")
-    .notNull()
-    .references(() => profiles.id, { onDelete: "cascade" }),
+  profileId: text("profile_id").notNull(),
   label: addressLabelEnum("label").notNull().default("school"),
   address: text("address").notNull(),
   schoolId: uuid("school_id").references(() => schools.id, { onDelete: "set null" }),
@@ -153,9 +151,7 @@ export const productNutritionalBenefits = pgTable(
 
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  parentId: uuid("parent_id")
-    .notNull()
-    .references(() => profiles.id, { onDelete: "cascade" }),
+  parentId: text("parent_id").notNull(),
   deliveryAddressId: uuid("delivery_address_id").references(
     () => deliveryAddresses.id,
     { onDelete: "set null" }
@@ -200,3 +196,27 @@ export const orderItems = pgTable("order_items", {
     .defaultNow()
     .notNull(),
 });
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  orderItems: many(orderItems),
+  deliveryAddress: one(deliveryAddresses, {
+    fields: [orders.deliveryAddressId],
+    references: [deliveryAddresses.id],
+  }),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+  }),
+  product: one(products, {
+    fields: [orderItems.productId],
+    references: [products.id],
+  }),
+  child: one(children, {
+    fields: [orderItems.childId],
+    references: [children.id],
+  }),
+}));
+

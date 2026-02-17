@@ -186,9 +186,9 @@ function ProductCard({
     <Link href={`/product/${product.id}`}>
       <div className="group flex flex-col bg-white dark:bg-surface-dark rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden transition-all hover:shadow-md">
         <div className="w-full h-40 bg-gray-200 relative overflow-hidden">
-          {product.image_url ? (
+          {product.imageUrl ? (
             <Image
-              src={product.image_url}
+              src={product.imageUrl}
               alt={product.name}
               fill
               sizes="(max-width: 448px) 100vw, 448px"
@@ -206,7 +206,7 @@ function ProductCard({
               </span>
             </div>
           )}
-          {product.is_new && (
+          {product.isNew && (
             <div className="absolute top-3 left-3 bg-primary text-black px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
               Nuevo
             </div>
@@ -217,7 +217,7 @@ function ProductCard({
             {product.name}
           </h4>
           <p className="text-text-sec-light dark:text-text-sec-dark text-xs font-medium">
-            {product.description || `${product.net_weight_g || ""}g`}
+            {product.description || `${product.netWeightG || ""}g`}
           </p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-text-main-light dark:text-text-main-dark text-lg font-bold">
@@ -225,7 +225,7 @@ function ProductCard({
             </p>
             <Button
               size="sm"
-              variant={product.is_new ? "default" : "secondary"}
+              variant={product.isNew ? "default" : "secondary"}
               className="flex items-center gap-1"
               disabled={childrenList.length === 0}
               onClick={handleAdd}

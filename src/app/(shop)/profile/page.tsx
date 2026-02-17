@@ -2,42 +2,25 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-
-const fetcher = async () => {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-  return { user, profile: data };
-};
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { data, error } = useSWR("profile", fetcher);
+  const { user, isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    await signOut(() => router.push("/"));
   };
 
-  if (error || !data?.user) {
+  if (!isLoaded || !isSignedIn || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-slate-500">Cargando...</p>
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
       </div>
     );
   }
-
-  const { user, profile } = data;
 
   return (
     <div className="min-h-screen bg-background-light dark:bg-background-dark pb-[calc(5rem+env(safe-area-inset-bottom,0px))]">
@@ -50,14 +33,18 @@ export default function ProfilePage() {
 
       <div className="p-6 space-y-6">
         <div className="flex items-center gap-4 p-4 bg-white dark:bg-surface-dark rounded-xl shadow-sm">
-          <div className="size-16 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-3xl text-primary">person</span>
+          <div className="size-16 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+            {user.imageUrl ? (
+              <img src={user.imageUrl} alt={user.fullName || "User"} className="w-full h-full object-cover" />
+            ) : (
+                <span className="material-symbols-outlined text-3xl text-primary">person</span>
+            )}
           </div>
           <div>
             <h2 className="font-bold text-lg">
-              {profile?.full_name || user.email}
+              {user.fullName || user.primaryEmailAddress?.emailAddress}
             </h2>
-            <p className="text-sm text-slate-500">{user.email}</p>
+            <p className="text-sm text-slate-500">{user.primaryEmailAddress?.emailAddress}</p>
           </div>
         </div>
 

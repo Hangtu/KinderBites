@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useCartStore } from "@/store/cart-store";
 import { useDeliveryAddresses } from "@/hooks/use-delivery-addresses";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { getSchools } from "@/actions/schools";
+import { createAddress } from "@/actions/addresses";
+import { createOrder } from "@/actions/orders";
 
 type School = { id: string; name: string; address: string };
 
@@ -31,23 +33,10 @@ const LABEL_MAP: Record<string, string> = {
   office: "Oficina",
 };
 
-function AddAddressForm({
-  schools,
-  selectedSchoolId,
-  setSelectedSchoolId,
-  schoolName,
-  address,
-  timeSlot,
-  setTimeSlot,
-  onSubmit,
-  loading,
-  error,
-  onCancel,
-}: {
+interface AddAddressFormProps {
   schools: School[];
   selectedSchoolId: string;
   setSelectedSchoolId: (id: string) => void;
-  schoolName: string;
   address: string;
   timeSlot: "morning" | "evening";
   setTimeSlot: (s: "morning" | "evening") => void;
@@ -55,7 +44,20 @@ function AddAddressForm({
   loading: boolean;
   error: string | null;
   onCancel: () => void;
-}) {
+}
+
+function AddAddressForm({
+  schools,
+  selectedSchoolId,
+  setSelectedSchoolId,
+  address,
+  timeSlot,
+  setTimeSlot,
+  onSubmit,
+  loading,
+  error,
+  onCancel,
+}: AddAddressFormProps) {
   return (
     <div className="p-4 rounded-xl border-2 border-primary/30 bg-white dark:bg-surface-dark space-y-4">
       <h4 className="font-bold text-sm">Nueva dirección</h4>
@@ -127,16 +129,11 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   useEffect(() => {
-    createClient()
-      .from("schools")
-      .select("id, name, address")
-      .eq("is_available", true)
-      .order("name")
-      .then(({ data }) => setSchools(data ?? []));
+    getSchools().then((data) => setSchools(data));
   }, []);
+
   const { items, getSubtotal, getTotal, isSubscription, clearCart } = useCartStore();
   const { addresses, isLoading: addressesLoading, refetch: refetchAddresses } = useDeliveryAddresses();
-  const supabase = createClient();
 
   const handleAddAddress = async () => {
     const addr = addAddrSelectedSchoolId && addAddrAddress.trim() ? addAddrAddress.trim() : "";
@@ -147,39 +144,29 @@ export default function CheckoutPage() {
     setAddAddrLoading(true);
     setAddAddrError(null);
     const preferredSlot = addAddrTimeSlot === "morning" ? "11:30" : "17:30";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      setAddAddrLoading(false);
-      return;
-    }
 
-    const { data: newAddr, error: insertError } = await supabase
-      .from("delivery_addresses")
-      .insert({
-        profile_id: user.id,
+    try {
+      const newAddr = await createAddress({
         label: "school",
         address: addr,
-        school_id: addAddrSelectedSchoolId || null,
-        school_name: addAddrSchoolName || null,
-        preferred_time_slot: preferredSlot,
-        is_default: false,
-      })
-      .select("id")
-      .single();
-    setAddAddrLoading(false);
-    if (insertError) {
-      setAddAddrError(insertError.message || "Error al guardar");
-      return;
+        schoolId: addAddrSelectedSchoolId || null,
+        schoolName: addAddrSchoolName || null,
+        preferredTimeSlot: preferredSlot,
+      });
+
+      await refetchAddresses();
+      if (newAddr && newAddr.id) {
+        setSelectedAddressId(newAddr.id);
+      }
+      setShowAddAddress(false);
+      setAddAddrAddress("");
+      setAddAddrSelectedSchoolId("");
+      setAddAddrSchoolName("");
+    } catch (err: any) {
+      setAddAddrError(err.message || "Error al guardar");
+    } finally {
+      setAddAddrLoading(false);
     }
-    await refetchAddresses();
-    setSelectedAddressId(newAddr.id);
-    setShowAddAddress(false);
-    setAddAddrAddress("");
-    setAddAddrSelectedSchoolId("");
-    setAddAddrSchoolName("");
   };
 
   const subtotal = getSubtotal();
@@ -194,13 +181,6 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push("/login");
-      setLoading(false);
-      return;
-    }
-
     if (!hasAddress) {
       setError("Selecciona una dirección de entrega");
       setLoading(false);
@@ -211,52 +191,38 @@ export default function CheckoutPage() {
     if (deliveryDate === "tomorrow") date.setDate(date.getDate() + 1);
     const deliveryDateStr = date.toISOString().slice(0, 10);
 
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        parent_id: user.id,
-        delivery_address_id: selectedAddressId,
-        delivery_date: deliveryDateStr,
-        delivery_time_slot: timeSlot,
+    try {
+      const order = await createOrder({
+        deliveryAddressId: selectedAddressId!,
+        deliveryDate: deliveryDateStr,
+        deliveryTimeSlot: timeSlot,
         subtotal,
         shipping,
-        subscription_discount: subscriptionDiscount,
-        total_amount: total,
-        is_subscription: isSubscription,
-        status: "pending",
-      })
-      .select("id")
-      .single();
-
-    if (orderError) {
-      setError(orderError.message || "Error al crear el pedido");
-      setLoading(false);
-      return;
-    }
-
-    for (const item of items) {
-      const { error: itemError } = await supabase.from("order_items").insert({
-        order_id: order.id,
-        product_id: item.product.id,
-        child_id: item.child.id,
-        quantity: item.quantity,
-        unit_price: item.product.price,
-        specific_notes: item.specific_notes,
+        subscriptionDiscount,
+        totalAmount: total,
+        isSubscription,
+        items: items.map((item) => ({
+          productId: item.product.id,
+          childId: item.child.id,
+          quantity: item.quantity,
+          unitPrice: Number(item.product.price),
+          specificNotes: item.specificNotes
+        }))
       });
-      if (itemError) {
-        setError("Error al guardar ítems del pedido");
-        setLoading(false);
-        return;
-      }
-    }
 
-    clearCart();
-    fetch("/api/send-order-confirmation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id }),
-    }).catch(() => {});
-    router.push(`/checkout/success?orderId=${order.id}`);
+      clearCart();
+      
+      fetch("/api/send-order-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      }).catch(() => {});
+      
+      router.push(`/checkout/success?orderId=${order.id}`);
+    } catch (err: any) {
+      setError(err.message || "Error al crear el pedido");
+      setLoading(false);
+    }
   };
 
   return (
@@ -317,7 +283,6 @@ export default function CheckoutPage() {
                         setAddAddrAddress(s.address);
                       }
                     }}
-                    schoolName={addAddrSchoolName}
                     address={addAddrAddress}
                     timeSlot={addAddrTimeSlot}
                     setTimeSlot={setAddAddrTimeSlot}
@@ -354,8 +319,8 @@ export default function CheckoutPage() {
                       <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
                         {addr.address}
                       </p>
-                      {addr.school_name && (
-                        <p className="text-xs text-slate-500">{addr.school_name}</p>
+                      {addr.schoolName && (
+                        <p className="text-xs text-slate-500">{addr.schoolName}</p>
                       )}
                     </div>
                     <div
@@ -381,7 +346,6 @@ export default function CheckoutPage() {
                         setAddAddrAddress(s.address);
                       }
                     }}
-                    schoolName={addAddrSchoolName}
                     address={addAddrAddress}
                     timeSlot={addAddrTimeSlot}
                     setTimeSlot={setAddAddrTimeSlot}

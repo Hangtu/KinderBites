@@ -4,19 +4,19 @@ export interface CartProduct {
   id: string;
   name: string;
   description: string | null;
-  price: number;
-  image_url: string | null;
+  price: number | string;
+  imageUrl: string | null;
   category: string;
-  age_range: string | null;
+  ageRange: string | null;
   rating: number | null;
-  net_weight_g: number | null;
+  netWeightG: number | string | null;
   preparation: string | null;
-  is_organic: boolean;
-  is_gluten_free: boolean;
-  is_new: boolean;
-  is_available: boolean;
-  created_at?: string;
-  updated_at?: string;
+  isOrganic: boolean | null;
+  isGlutenFree: boolean | null;
+  isNew: boolean | null;
+  isAvailable: boolean;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface CartChild {
@@ -29,7 +29,7 @@ export interface CartItem {
   product: CartProduct;
   child: CartChild;
   quantity: number;
-  specific_notes: string | null;
+  specificNotes: string | null;
 }
 
 interface CartState {
@@ -67,7 +67,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         next[existing] = {
           ...next[existing],
           quantity: next[existing].quantity + quantity,
-          specific_notes: notes ?? next[existing].specific_notes,
+          specificNotes: notes ?? next[existing].specificNotes,
         };
         return { items: next };
       }
@@ -76,7 +76,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         product,
         child,
         quantity,
-        specific_notes: notes,
+        specificNotes: notes,
       };
       return { items: [...state.items, newItem] };
     });

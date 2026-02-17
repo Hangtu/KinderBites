@@ -1,29 +1,24 @@
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
+import { getChildren } from "@/actions/children";
 
 export interface Child {
   id: string;
-  parent_id: string;
+  parentId: string;
   name: string;
-  birth_date: string | null;
-  school_name: string | null;
+  birthDate: string | null;
+  schoolName: string | null;
   grade: string | null;
-  allergy_ids: string[];
-  avoided_foods: string[];
-  special_notes: string | null;
-  profile_image_url: string | null;
-  created_at: string;
-  updated_at: string;
+  allergyIds: string[] | null;
+  avoidedFoods: string[] | null;
+  specialNotes: string | null;
+  profileImageUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const fetcher = async () => {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("children")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as Child[];
+  const data = await getChildren();
+  return data as unknown as Child[];
 };
 
 export function useChildren() {

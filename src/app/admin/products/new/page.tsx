@@ -6,31 +6,30 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createProduct } from "@/actions/products";
 
 const schema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Precio debe ser positivo"),
   category: z.enum(["age_6_12", "age_1_2", "snack", "drink"]),
-  age_range: z.string().optional(),
-  net_weight_g: z.coerce.number().optional(),
+  imageUrl: z.string().optional(),
+  ageRange: z.string().optional(),
+  netWeightG: z.coerce.number().optional(),
   preparation: z.string().optional(),
-  is_organic: z.boolean().default(false),
-  is_gluten_free: z.boolean().default(false),
-  is_new: z.boolean().default(false),
+  isOrganic: z.boolean().default(false),
+  isGlutenFree: z.boolean().default(false),
+  isNew: z.boolean().default(false),
 });
 
 type FormData = z.infer<typeof schema>;
 
 export default function NewProductPage() {
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   const {
     register,
@@ -40,54 +39,40 @@ export default function NewProductPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       category: "age_6_12",
-      is_organic: false,
-      is_gluten_free: false,
-      is_new: false,
+      isOrganic: false,
+      isGlutenFree: false,
+      isNew: false,
     },
   });
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setError(null);
-    let imageUrl: string | null = null;
 
-    if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `products/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("lonchi-products")
-        .upload(path, imageFile, { upsert: true });
+    try {
+      await createProduct({
+        name: data.name,
+        description: data.description || null,
+        price: data.price.toString(),
+        imageUrl: data.imageUrl || null,
+        category: data.category,
+        ageRange: data.ageRange || null,
+        netWeightG: data.netWeightG ? data.netWeightG.toString() : null,
+        preparation: data.preparation || null,
+        isOrganic: data.isOrganic,
+        isGlutenFree: data.isGlutenFree,
+        isNew: data.isNew,
+        isAvailable: true,
+      });
 
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from("lonchi-products")
-          .getPublicUrl(path);
-        imageUrl = urlData.publicUrl;
-      }
+      router.push("/admin/products");
+      router.refresh();
+    } catch (err: any) {
+        console.error(err);
+        setError(err.message || "Error al crear producto");
+    } finally {
+        setLoading(false);
     }
-
-    const { error: insertError } = await supabase.from("products").insert({
-      name: data.name,
-      description: data.description || null,
-      price: data.price,
-      image_url: imageUrl,
-      category: data.category,
-      age_range: data.age_range || null,
-      net_weight_g: data.net_weight_g || null,
-      preparation: data.preparation || null,
-      is_organic: data.is_organic,
-      is_gluten_free: data.is_gluten_free,
-      is_new: data.is_new,
-      is_available: true,
-    });
-
-    setLoading(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-    router.push("/admin/products");
-    router.refresh();
   };
 
   return (
@@ -100,13 +85,9 @@ export default function NewProductPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Imagen</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm"
-            />
+            <label className="block text-sm font-medium mb-2">URL de Imagen</label>
+             <Input {...register("imageUrl")} placeholder="https://..." />
+             <p className="text-xs text-slate-500 mt-1">Carga de archivos deshabilitada temporalmente por migración.</p>
           </div>
 
           <div>
@@ -150,11 +131,11 @@ export default function NewProductPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Edad mínima</label>
-              <Input {...register("age_range")} placeholder="6+ Meses" />
+              <Input {...register("ageRange")} placeholder="6+ Meses" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">Peso neto (g)</label>
-              <Input type="number" {...register("net_weight_g")} placeholder="120" />
+              <Input type="number" {...register("netWeightG")} placeholder="120" />
             </div>
           </div>
 
@@ -171,15 +152,15 @@ export default function NewProductPage() {
 
           <div className="flex gap-6">
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_organic")} className="rounded" />
+              <input type="checkbox" {...register("isOrganic")} className="rounded" />
               <span className="text-sm">Orgánico</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_gluten_free")} className="rounded" />
+              <input type="checkbox" {...register("isGlutenFree")} className="rounded" />
               <span className="text-sm">Sin gluten</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_new")} className="rounded" />
+              <input type="checkbox" {...register("isNew")} className="rounded" />
               <span className="text-sm">Nuevo</span>
             </label>
           </div>

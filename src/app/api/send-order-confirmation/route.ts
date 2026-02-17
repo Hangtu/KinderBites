@@ -1,7 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { businessInfo } from "@/lib/business-info";
+import { db } from "@/lib/db";
+import { currentUser } from "@clerk/nextjs/server";
+import { orders } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -24,49 +27,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "orderId requerido" }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) {
+  const user = await currentUser();
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+
+  if (!user || !userEmail) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { data: order } = await supabase
-    .from("orders")
-    .select(`
-      *,
-      order_items (
-        quantity,
-        unit_price,
-        products (name),
-        children (name)
-      ),
-      delivery_addresses (label, address, school_name)
-    `)
-    .eq("id", orderId)
-    .eq("parent_id", user.id)
-    .single();
+  const order = await db.query.orders.findFirst({
+    where: eq(orders.id, orderId),
+    with: {
+      orderItems: {
+        with: {
+          product: true,
+          child: true,
+        },
+      },
+      deliveryAddress: true,
+    },
+  });
 
   if (!order) {
     return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
   }
 
-  const itemsList = (order.order_items ?? [])
+  if (order.parentId !== user.id) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
+
+  const itemsList = (order.orderItems ?? [])
     .map(
       (item: any) =>
-        `• ${item.quantity}x ${item.products?.name ?? "Producto"} - $${(Number(item.unit_price) * item.quantity).toFixed(2)}`
+        `• ${item.quantity}x ${item.product?.name ?? "Producto"} - $${(Number(item.unitPrice) * item.quantity).toFixed(2)}`
     )
     .join("\n");
 
-  const address = order.delivery_addresses
-    ? `${LABEL_MAP[order.delivery_addresses.label] || order.delivery_addresses.label}: ${order.delivery_addresses.address}${order.delivery_addresses.school_name ? ` (${order.delivery_addresses.school_name})` : ""}`
+  const address = order.deliveryAddress
+    ? `${LABEL_MAP[order.deliveryAddress.label] || order.deliveryAddress.label}: ${order.deliveryAddress.address}${order.deliveryAddress.schoolName ? ` (${order.deliveryAddress.schoolName})` : ""}`
     : "Sin dirección";
 
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? `onboarding@resend.dev`;
   const { error } = await resend.emails.send({
     from: `${businessInfo.name} <${fromEmail}>`,
-    to: user.email,
+    to: userEmail,
     subject: `Pedido confirmado #${orderId.slice(0, 8)} - ${businessInfo.name}`,
     html: `
       <h2>¡Gracias por tu pedido!</h2>
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
       <h3>Resumen</h3>
       <pre style="font-family: sans-serif; white-space: pre-wrap;">${itemsList}</pre>
       <p><strong>Entregar en:</strong><br>${address}</p>
-      <p><strong>Total:</strong> $${Number(order.total_amount).toFixed(2)}</p>
+      <p><strong>Total:</strong> $${Number(order.totalAmount).toFixed(2)}</p>
       <p>Si tienes dudas, contáctanos: ${businessInfo.phone} o ${businessInfo.email}</p>
     `,
   });

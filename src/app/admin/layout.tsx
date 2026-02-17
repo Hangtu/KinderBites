@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function AdminLayout({
@@ -6,15 +6,10 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await auth();
 
-  if (!user) {
-    const loginPath =
-      process.env.NEXT_PUBLIC_ENV === "local" ? "/dev-auto-login" : "/login";
-    redirect(`${loginPath}?redirect=/admin/products`);
+  if (!userId) {
+    redirect("/login?redirect=/admin/products");
   }
 
   return <>{children}</>;

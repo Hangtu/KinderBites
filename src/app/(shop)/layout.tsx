@@ -1,32 +1,39 @@
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Footer } from "@/components/footer";
+import { db } from "@/lib/db";
+import { children as childrenTable, deliveryAddresses } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 export default async function ShopLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await auth();
 
-  if (!user) {
-    const loginPath =
-      process.env.NEXT_PUBLIC_ENV === "local" ? "/dev-auto-login" : "/login";
-    redirect(`${loginPath}?redirect=/menu`);
+  if (!userId) {
+    redirect("/login?redirect=/menu");
   }
 
-  const [{ count: childrenCount }, { count: addressesCount }] = await Promise.all([
-    supabase.from("children").select("id", { count: "exact", head: true }).eq("parent_id", user.id),
-    supabase.from("delivery_addresses").select("id", { count: "exact", head: true }).eq("profile_id", user.id),
+  const [childrenCountResult, addressesCountResult] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(childrenTable)
+      .where(eq(childrenTable.parentId, userId)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(deliveryAddresses)
+      .where(eq(deliveryAddresses.profileId, userId)),
   ]);
 
-  if ((childrenCount ?? 0) === 0) {
+  const childrenCount = Number(childrenCountResult[0]?.count ?? 0);
+  const addressesCount = Number(addressesCountResult[0]?.count ?? 0);
+
+  if (childrenCount === 0) {
     redirect("/onboarding/child");
   }
-  if ((addressesCount ?? 0) === 0) {
+  if (addressesCount === 0) {
     redirect("/onboarding/address");
   }
 

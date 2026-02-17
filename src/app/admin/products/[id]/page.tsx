@@ -6,22 +6,23 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getProduct, updateProduct } from "@/actions/products";
 
 const schema = z.object({
   name: z.string().min(1, "Nombre requerido"),
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Precio debe ser positivo"),
   category: z.enum(["age_6_12", "age_1_2", "snack", "drink"]),
-  age_range: z.string().optional(),
-  net_weight_g: z.coerce.number().optional(),
+  imageUrl: z.string().optional(),
+  ageRange: z.string().optional(),
+  netWeightG: z.coerce.number().optional(),
   preparation: z.string().optional(),
-  is_organic: z.boolean().default(false),
-  is_gluten_free: z.boolean().default(false),
-  is_new: z.boolean().default(false),
-  is_available: z.boolean().default(true),
+  isOrganic: z.boolean().default(false),
+  isGlutenFree: z.boolean().default(false),
+  isNew: z.boolean().default(false),
+  isAvailable: z.boolean().default(true),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -29,13 +30,11 @@ type FormData = z.infer<typeof schema>;
 export default function EditProductPage() {
   const params = useParams();
   const id = params.id as string;
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   const {
     register,
@@ -46,90 +45,74 @@ export default function EditProductPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       category: "age_6_12",
-      is_organic: false,
-      is_gluten_free: false,
-      is_new: false,
-      is_available: true,
+      isOrganic: false,
+      isGlutenFree: false,
+      isNew: false,
+      isAvailable: true,
     },
   });
 
   useEffect(() => {
     const fetchProduct = async () => {
-      const { data, error: fetchError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
+      try {
+        const data = await getProduct(id);
+        setFetching(false);
 
-      setFetching(false);
-      if (fetchError || !data) {
-        setFetchError("Producto no encontrado");
-        return;
+        if (!data) {
+          setFetchError("Producto no encontrado");
+          return;
+        }
+
+        reset({
+          name: data.name,
+          description: data.description ?? "",
+          price: Number(data.price),
+          category: data.category as any, // Cast to enum
+          imageUrl: data.imageUrl ?? "",
+          ageRange: data.ageRange ?? "",
+          netWeightG: data.netWeightG ? Number(data.netWeightG) : undefined,
+          preparation: data.preparation ?? "",
+          isOrganic: data.isOrganic ?? false,
+          isGlutenFree: data.isGlutenFree ?? false,
+          isNew: data.isNew ?? false,
+          isAvailable: data.isAvailable ?? true,
+        });
+      } catch (err) {
+        console.error(err);
+        setFetching(false);
+        setFetchError("Error al cargar producto");
       }
-      reset({
-        name: data.name,
-        description: data.description ?? "",
-        price: Number(data.price),
-        category: data.category,
-        age_range: data.age_range ?? "",
-        net_weight_g: data.net_weight_g ? Number(data.net_weight_g) : undefined,
-        preparation: data.preparation ?? "",
-        is_organic: data.is_organic ?? false,
-        is_gluten_free: data.is_gluten_free ?? false,
-        is_new: data.is_new ?? false,
-        is_available: data.is_available ?? true,
-      });
     };
-    fetchProduct();
+    if (id) fetchProduct();
   }, [id, reset]);
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setSubmitError(null);
-    let imageUrl: string | undefined;
 
-    if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
-      const path = `products/${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("lonchi-products")
-        .upload(path, imageFile, { upsert: true });
+    try {
+      await updateProduct(id, {
+        name: data.name,
+        description: data.description || null,
+        price: data.price.toString(),
+        imageUrl: data.imageUrl || null,
+        category: data.category,
+        ageRange: data.ageRange || null,
+        netWeightG: data.netWeightG ? data.netWeightG.toString() : null,
+        preparation: data.preparation || null,
+        isOrganic: data.isOrganic,
+        isGlutenFree: data.isGlutenFree,
+        isNew: data.isNew,
+        isAvailable: data.isAvailable,
+      });
 
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from("lonchi-products")
-          .getPublicUrl(path);
-        imageUrl = urlData.publicUrl;
-      }
+      router.push("/admin/products");
+      router.refresh();
+    } catch (err: any) {
+      console.error(err);
+      setLoading(false);
+      setSubmitError(err.message || "Error al actualizar producto");
     }
-
-    const updateData: Record<string, unknown> = {
-      name: data.name,
-      description: data.description || null,
-      price: data.price,
-      category: data.category,
-      age_range: data.age_range || null,
-      net_weight_g: data.net_weight_g ?? null,
-      preparation: data.preparation || null,
-      is_organic: data.is_organic,
-      is_gluten_free: data.is_gluten_free,
-      is_new: data.is_new,
-      is_available: data.is_available,
-    };
-    if (imageUrl) updateData.image_url = imageUrl;
-
-    const { error: updateError } = await supabase
-      .from("products")
-      .update(updateData)
-      .eq("id", id);
-
-    setLoading(false);
-    if (updateError) {
-      setSubmitError(updateError.message);
-      return;
-    }
-    router.push("/admin/products");
-    router.refresh();
   };
 
   if (fetching) {
@@ -161,13 +144,9 @@ export default function EditProductPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Imagen (dejar vacío para mantener)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm"
-            />
+            <label className="block text-sm font-medium mb-2">URL de Imagen</label>
+             <Input {...register("imageUrl")} placeholder="https://..." />
+             <p className="text-xs text-slate-500 mt-1">Carga de archivos deshabilitada temporalmente por migración.</p>
           </div>
 
           <div>
@@ -211,11 +190,11 @@ export default function EditProductPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Edad mínima</label>
-              <Input {...register("age_range")} placeholder="6+ Meses" />
+              <Input {...register("ageRange")} placeholder="6+ Meses" />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">Peso neto (g)</label>
-              <Input type="number" {...register("net_weight_g")} placeholder="120" />
+              <Input type="number" {...register("netWeightG")} placeholder="120" />
             </div>
           </div>
 
@@ -226,19 +205,19 @@ export default function EditProductPage() {
 
           <div className="flex flex-wrap gap-6">
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_organic")} className="rounded" />
+              <input type="checkbox" {...register("isOrganic")} className="rounded" />
               <span className="text-sm">Orgánico</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_gluten_free")} className="rounded" />
+              <input type="checkbox" {...register("isGlutenFree")} className="rounded" />
               <span className="text-sm">Sin gluten</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_new")} className="rounded" />
+              <input type="checkbox" {...register("isNew")} className="rounded" />
               <span className="text-sm">Nuevo</span>
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" {...register("is_available")} className="rounded" />
+              <input type="checkbox" {...register("isAvailable")} className="rounded" />
               <span className="text-sm">Disponible</span>
             </label>
           </div>

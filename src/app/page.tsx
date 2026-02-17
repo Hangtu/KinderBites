@@ -1,15 +1,10 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { userId } = await auth();
 
-  if (user) {
+  if (userId) {
     redirect("/menu");
   } else {
     redirect("/onboarding/welcome");

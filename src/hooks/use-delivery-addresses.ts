@@ -1,27 +1,21 @@
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
+import { getAddresses } from "@/actions/addresses";
 
 export interface DeliveryAddress {
   id: string;
-  profile_id: string;
+  profileId: string;
   label: string;
   address: string;
-  school_name: string | null;
-  preferred_time_slot: string | null;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
+  schoolName: string | null;
+  preferredTimeSlot: string | null;
+  isDefault: boolean | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const fetcher = async () => {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("delivery_addresses")
-    .select("*")
-    .order("is_default", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as DeliveryAddress[];
+  const data = await getAddresses();
+  return data as unknown as DeliveryAddress[];
 };
 
 export function useDeliveryAddresses() {

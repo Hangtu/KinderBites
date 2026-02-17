@@ -4,16 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { getAdminProducts } from "@/actions/products";
 
 const fetcher = async () => {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
+  const data = await getAdminProducts();
   return data ?? [];
 };
 
@@ -49,12 +44,12 @@ export default function AdminProductsPage() {
               <div
                 className="size-16 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 bg-cover bg-center"
                 style={
-                  product.image_url
-                    ? { backgroundImage: `url(${product.image_url})` }
+                  product.imageUrl
+                    ? { backgroundImage: `url(${product.imageUrl})` }
                     : {}
                 }
               >
-                {!product.image_url && (
+                {!product.imageUrl && (
                   <div className="w-full h-full flex items-center justify-center text-2xl">
                     🍽️
                   </div>

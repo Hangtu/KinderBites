@@ -29,16 +29,18 @@ export default function ProductDetailPage() {
         name: product.name,
         description: product.description,
         price: product.price,
-        image_url: product.image_url,
+        imageUrl: product.imageUrl,
         category: product.category,
-        age_range: product.age_range,
+        ageRange: product.ageRange,
         rating: product.rating,
-        net_weight_g: product.net_weight_g,
+        netWeightG: product.netWeightG,
         preparation: product.preparation,
-        is_organic: product.is_organic,
-        is_gluten_free: product.is_gluten_free,
-        is_new: product.is_new,
-        is_available: product.is_available,
+        isOrganic: product.isOrganic,
+        isGlutenFree: product.isGlutenFree,
+        isNew: product.isNew,
+        isAvailable: product.isAvailable,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
       },
       { id: selectedChild.id, name: selectedChild.name },
       quantity
@@ -90,9 +92,9 @@ export default function ProductDetailPage() {
       {/* Hero Image */}
       <div className="w-full px-4 pt-2 pb-4">
         <div className="relative w-full overflow-hidden rounded-2xl shadow-sm aspect-[4/3]">
-          {product.image_url ? (
+          {product.imageUrl ? (
             <Image
-              src={product.image_url}
+              src={product.imageUrl}
               alt={product.name}
               fill
               sizes="(max-width: 768px) 100vw, 768px"
@@ -125,19 +127,19 @@ export default function ProductDetailPage() {
 
         {/* Badges */}
         <div className="flex flex-wrap gap-2">
-          {product.age_range && (
+          {product.ageRange && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-3 py-1.5 text-sm font-bold text-green-800 dark:text-green-200 border border-primary/20">
               <span className="material-symbols-outlined text-lg">child_care</span>
-              {product.age_range}
+              {product.ageRange}
             </span>
           )}
-          {product.is_organic && (
+          {product.isOrganic && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-100 dark:bg-orange-900/30 px-3 py-1.5 text-sm font-bold text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800">
               <span className="material-symbols-outlined text-lg">eco</span>
               Orgánico
             </span>
           )}
-          {product.is_gluten_free && (
+          {product.isGlutenFree && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 text-sm font-bold text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
               <span className="material-symbols-outlined text-lg">grain</span>
               Sin Gluten

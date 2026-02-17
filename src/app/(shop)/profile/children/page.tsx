@@ -59,12 +59,12 @@ export default function ProfileChildrenPage() {
                 {child.grade && (
                   <p className="text-sm text-slate-500">{child.grade}</p>
                 )}
-                {child.school_name && (
-                  <p className="text-sm text-slate-500">{child.school_name}</p>
+                {child.schoolName && (
+                  <p className="text-sm text-slate-500">{child.schoolName}</p>
                 )}
-                {child.allergy_ids && child.allergy_ids.length > 0 && (
+                {child.allergyIds && child.allergyIds.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {child.allergy_ids.map((aid) => (
+                    {child.allergyIds.map((aid) => (
                       <span
                         key={aid}
                         className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200"

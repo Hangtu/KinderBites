@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { Plus_Jakarta_Sans, Noto_Sans } from "next/font/google";
-import { AuthSessionHandler } from "@/components/auth-session-handler";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -41,22 +41,23 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="es" suppressHydrationWarning>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body
-        className={`${plusJakarta.variable} ${notoSans.variable} font-[family-name:var(--font-display)] antialiased`}
-        style={{ fontFamily: "var(--font-display)" }}
-      >
-        <NextIntlClientProvider messages={messages}>
-          <AuthSessionHandler />
-          {children}
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="es" suppressHydrationWarning>
+        <head>
+          <link
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+            rel="stylesheet"
+          />
+        </head>
+        <body
+          className={`${plusJakarta.variable} ${notoSans.variable} font-[family-name:var(--font-display)] antialiased`}
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          <NextIntlClientProvider messages={messages}>
+            {children}
+          </NextIntlClientProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

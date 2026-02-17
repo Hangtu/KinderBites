@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { insertChildSchema } from "@/schemas";
 import { useOnboardingStore } from "@/store/onboarding-store";
+import { getChild, createChild, updateChild } from "@/actions/children";
 
 const childFormSchema = insertChildSchema;
 
@@ -36,7 +37,7 @@ function OnboardingChildPageInner() {
   const [loading, setLoading] = useState(false);
   const [loadingChild, setLoadingChild] = useState(!!editId);
   const router = useRouter();
-  const supabase = createClient();
+  const { user } = useUser();
   const { child, setChild } = useOnboardingStore();
 
   const {
@@ -61,23 +62,24 @@ function OnboardingChildPageInner() {
   useEffect(() => {
     if (!editId) return;
     (async () => {
-      const { data, error } = await supabase
-        .from("children")
-        .select("*")
-        .eq("id", editId)
-        .single();
-      setLoadingChild(false);
-      if (error || !data) return;
-      reset({
-        name: data.name,
-        birthDate: data.birth_date ?? "",
-        schoolName: data.school_name ?? "",
-        grade: data.grade ?? "",
-      });
-      setSelectedAllergies(data.allergy_ids ?? []);
-      setAvoidedFoods(data.avoided_foods ?? []);
+      try {
+        const data = await getChild(editId);
+        setLoadingChild(false);
+        if (!data) return;
+        reset({
+          name: data.name,
+          birthDate: data.birthDate ?? "",
+          schoolName: data.schoolName ?? "",
+          grade: data.grade ?? "",
+        });
+        setSelectedAllergies(data.allergyIds ?? []);
+        setAvoidedFoods(data.avoidedFoods ?? []);
+      } catch (err) {
+        console.error(err);
+        setLoadingChild(false);
+      }
     })();
-  }, [editId, reset, supabase]);
+  }, [editId, reset]);
 
   const toggleAllergy = (id: string) => {
     setSelectedAllergies((prev) =>
@@ -101,33 +103,23 @@ function OnboardingChildPageInner() {
 
     // Modo edición: siempre requiere usuario (datos ya persistidos)
     if (isEdit && editId) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login?redirect=/profile/children");
         setLoading(false);
         return;
       }
 
-      const { error } = await supabase
-        .from("children")
-        .update({
-          name: data.name,
-          birth_date: data.birthDate || null,
-          school_name: data.schoolName ?? "",
-          grade: data.grade ?? "",
-          allergy_ids: selectedAllergies,
-          avoided_foods: avoidedFoods,
-          special_notes: data.specialNotes ?? null,
-        })
-        .eq("id", editId);
+      await updateChild(editId, {
+        name: data.name,
+        birthDate: data.birthDate || null,
+        schoolName: data.schoolName ?? "",
+        grade: data.grade ?? "",
+        allergyIds: selectedAllergies,
+        avoidedFoods: avoidedFoods,
+        specialNotes: data.specialNotes ?? null,
+      });
 
       setLoading(false);
-      if (error) {
-        console.error(error);
-        return;
-      }
       router.push("/profile/children");
       router.refresh();
       return;
