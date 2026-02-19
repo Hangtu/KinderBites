@@ -97,7 +97,7 @@ _Use only the tools listed below. Do not introduce new libraries without permiss
 ### Core Stack
 
 - **Frontend:** Next.js 15 (App Router), React 19
-- **Styling:** Tailwind CSS v4, Mobile Fist, componentes UI (button, input, card, etc.), Lucide Icons
+- **Styling:** Tailwind CSS v4, Mobile First, componentes UI (button, input, card, etc.), Lucide Icons
 - **Backend/BaaS:** NeonDB (DB), Cloudflare R2 (Storage)
 - **Database:** PostgreSQL vía NeonDB, ORM Drizzle
 - **State Management:** Zustand (carrito, onboarding), SWR (fetching)
